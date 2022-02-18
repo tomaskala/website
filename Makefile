@@ -3,7 +3,7 @@
 
 PANDOC_ARGS = --template parts/template.html -B parts/header.html -A parts/footer.html --standalone --shift-heading-level-by 1
 PARTS = $(shell ls parts/*.html)
-MARKDOWN = $(shell find . -type f -name '*.md')
+MARKDOWN = $(shell find . -type f -not -name 'README.md' -name '*.md')
 MARKDOWN += index.md
 HTML = $(MARKDOWN:.md=.html)
 
