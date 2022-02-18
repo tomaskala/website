@@ -12,7 +12,7 @@ all: $(HTML)
 
 $(HTML): $(PARTS)
 
-index.md:
+index.md: fill-index
 	./fill-index
 
 .PHONY: clean
