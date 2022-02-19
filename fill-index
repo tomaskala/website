@@ -2,7 +2,7 @@
 
 {
   printf -- '---\n'
-  printf 'title: tom@skala\n'
+  printf 'title: Posts\n'
   printf -- '---\n'
   printf '\n'
 } > index.md
