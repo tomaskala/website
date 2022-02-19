@@ -1,5 +1,5 @@
 body {
-  color: #333;
+  color: #333333;
   font-family: monaco, monospace;
   line-height: 1.5;
   margin: 0 auto;
@@ -14,16 +14,16 @@ a, a:hover, a:active, a:visited {
   text-decoration: none;
 }
 a:link {
-  color: #00e;
+  color: #044f3b;
 }
 a:visited {
-  color: #00e;
+  color: #044f3b;
 }
 a:focus, a:hover {
-  color: #03f;
+  color: #367262;
 }
 a:active {
-  color: #e00;
+  color: #4f0418;
 }
 h1 a:empty:before, h2 a:empty:before, h3 a:empty:before,
 h4 a:empty:before, h5 a:empty:before, h6 a:empty:before {
@@ -48,21 +48,22 @@ figcaption {
   font-size: small;
 }
 pre, code, samp, kbd {
-  color: #009;
+  color: #333333;
   font-family: monospace, monospace;
 }
 pre kbd {
-  color: #060;
+  color: #000000;
+  font-weight: bold;
 }
 pre, blockquote {
-  background: #eee;
+  background: #eeeeee;
   padding: 0.5em;
 }
 pre {
   overflow: auto;
 }
 blockquote {
-  border-left: medium solid #ccc;
+  border-left: medium solid #cccccc;
   margin: 1em 0;
 }
 blockquote :first-child {
@@ -75,41 +76,42 @@ table {
   border-collapse: collapse;
 }
 th, td {
-  border: thin solid #999;
+  border: thin solid #999999;
   padding: 0.3em 0.4em;
   text-align: left;
 }
 @media (prefers-color-scheme: dark) {
   body {
-    background: #111;
-    color: #bbb;
+    background: #111111;
+    color: #bbbbbb;
   }
   a:link {
-    color: #9bf;
+    color: #6eb183;
   }
   a:visited {
-    color: #9bf;
+    color: #6eb183;
   }
   a:focus, a:hover {
-    color: #9cf;
+    color: #588e69;
   }
   a:active {
-    color: #faa;
+    color: #b16e7f;
   }
   pre, code, samp, kbd {
-    color: #6cf;
+    color: #bbbbbb;
   }
   pre kbd {
-    color: #9c6;
+    color: #ffffff;
+    font-weight: bold;
   }
   pre, blockquote {
-    background: #000;
+    background: #222222;
   }
   blockquote {
-    border-color: #333;
+    border-color: #333333;
   }
   th, td {
-    border-color: #666;
+    border-color: #666666;
   }
 }
 ol > li {
