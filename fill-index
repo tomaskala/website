@@ -15,7 +15,7 @@ find posts -maxdepth 1 -type f -name '*.md' | sort -r | while read -r f; do
   # No .html extension: assumes that nginx knows how to append it.
   # This makes for nicer looking URLs.
   html="${f%.md}"
-  printf '* %s [%s](%s)\n' "${published}" "${title}" "${html}" >> index.md
+  printf '* %s :: [%s](%s)\n' "${published}" "${title}" "${html}" >> index.md
 
   if [ -z "${datepart}" ]; then
     printf 'WARNING: No date found in file name %s\n' "${f}" >&2
