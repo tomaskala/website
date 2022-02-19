@@ -3,7 +3,7 @@ body {
   font-family: helvetica, arial, sans-serif;
   line-height: 1.5;
   margin: 0 auto;
-  max-width: 40em;
+  max-width: 48em;
   padding: 0 1em;
 }
 h1, h2, h3, h4, h5, h6 {
@@ -119,6 +119,7 @@ ul > li {
   list-style-type: square;
 }
 #header {
+  width: 100%;
   clear: both;
   display: table;
   margin-left: auto;
@@ -134,10 +135,13 @@ ul > li {
 }
 #header-right {
   float: right;
-  padding: 10px 20px;
+  margin-right: 160px;
   text-align: center;
 }
-#header-right a {
+#header-right > h1 {
+  font-size: 2.8em;
+}
+#header-right > a {
   margin: 0px 16px;
 }
 #footer {
