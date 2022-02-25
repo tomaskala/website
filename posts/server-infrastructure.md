@@ -160,7 +160,12 @@ filter ads, but it's better than nothing.
 
 ## Nginx
 
-* This website
+At the moment, [nginx](https://nginx.org/en/) only hosts this site and the RSS
+reader described below. The basic configuration is based on [Mozilla SSL
+Configuration Generator](https://ssl-config.mozilla.org/). I went for the
+modern configuration, so this site is probably not readable on IE 6 and other
+web browsers from the stone age. On the other hand, it's perfectly usable in
+[Lynx](https://lynx.invisible-island.net/), though you'll miss the nice goblin.
 
 ## RSS reader
 
