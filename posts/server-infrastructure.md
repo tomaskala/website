@@ -54,17 +54,36 @@ The rest of the post describes the various services that I have running.
 
 ## WireGuard
 
-* Security
-* Laptop for security on untrusted networks
-* Phone
+[WireGuard](https://www.wireguard.com/) is the heart of the entire
+infrastructure. It's exactly as performant and easy to configure and
+advertised, the precise opposite of OpenVPN. If I want to secure a particular
+service, I simply expose it only on the WireGuard interface. It's like magic.
+If I ever need to share some services with friends or family, I simply let them
+inside the network.
+
+The primary use-case is to secure the server access. The SSH server is only
+accessible from within the VPN, which has the nice side effect of keeping my
+logs clean from dumb bots attempting to brute-force their way inside.
+
+Having a secure way to access the internet also means that I don't have to feel
+dirty every time I use a network in a café or a hotel. Of course, some hotels,
+airports etc. like to do port blocking, but bypassing that is a future post and
+a future side project.
+
+Finally, there's the topic of my phone. That's actually the primary reason I
+had for setting up the VPN. Due to our corporate security policy, our work
+network is monitored, and only traffic to domains blessed by the powers that be
+is allowed. That's is OK to enforce on company-owned devices like my work
+laptop. But there's no way in hell I'll let anyone monitor or limit which
+websites I visit on my personal phone so I keep it connected to the VPN 24/7.
 
 ## Unbound
 
-Within the VPN, I run the
+Inside the VPN, I run the
 [Unbound](https://nlnetlabs.nl/projects/unbound/about/) DNS resolver. It's
 exactly the kind of software that I like: small, extensively tested, has been
-security audited, has a large community around it, and does one thing well.
-There are several use cases:
+audited, has a large community around it, and does one thing well. There are
+several use cases:
 
 ### Privacy and security
 
