@@ -169,6 +169,17 @@ web browsers from the stone age. On the other hand, it's perfectly usable in
 
 ## RSS reader
 
+A minor service, though something I use several times a day. Turns out, RSS is
+still not forgotten, and most websites I visit do have a feed. I admit that I
+live in a bubble here, because most websites I read are blogs of other
+programmers, who are fine implementing one.
+
+At the moment, I use
+[sfeed](https://codemadness.org/sfeed-simple-feed-parser.html). I have a
+cronjob that polls the feeds of all the websites in my config several times a
+day, and calls the HTML conversion utility of sfeed. The result is a simple
+webpage with new posts highlighted.
+
 ## Git
 
 I have all my repositories mirrored to the server. This is mostly for backup in
