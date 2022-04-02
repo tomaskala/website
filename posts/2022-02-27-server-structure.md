@@ -1,11 +1,11 @@
 ---
-title: Infrastructure
+title: Server structure
 date: 2022/02/27
 ---
 
-In this post, I want to document my server infrastructure. Mostly for myself to
-have a reference to come back to, but perhaps someone will find something
-useful here. I also want to update this document whenever I add anything new.
+In this post, I want to document my server structure. Mostly for myself to have
+a reference to come back to, but perhaps someone will find something useful
+here. I also want to update this document whenever I add anything new.
 
 I keep my configuration in a [git
 repository](https://github.com/tomaskala/server-config). This has been evolving
