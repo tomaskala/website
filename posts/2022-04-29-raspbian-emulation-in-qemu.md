@@ -31,7 +31,7 @@ machine, so that Ansible can be tested.
 
 * Install QEMU.
   ```
-  # pacman -S qemu qemu-arch-extra
+  # pacman -S qemu-full qemu-emulators-full
   ```
 * Download a QEMU kernel and a DTB file (containing the hardware description)
   from
@@ -139,9 +139,56 @@ It is then possible to connect from the host to the guest over SSH.
 $ ssh <admin-username>@127.0.0.1 -p 5022
 ```
 
-# Note on networking
+# Setup bridged networking
 
-By default, QEMU uses user-mode networking with a built-in DHCP server. When a
+By default, QEMU uses user-mode networking with a virtual DHCP server. When a
 virtual machine runs its DHCP client, it gets assigned an IP address and is
 then able to access the host machine's network stack through masquerading done
 by QEMU.
+
+This has a couple of issues, which may or may not be relevant, depending on the
+use case.
+* Because the network emulation happens in the user space, its performance can
+  be quite poor.
+* If we want to expose additional services running on the guest machine (like
+  we do with SSH above), we must shutdown the machine and relaunch it with
+  additional forwarding arguments to QEMU.
+
+A solution is to setup a bridged network. We create a network bridge between
+the guest's virtual TAP interface and the host's physical interface. The
+virtual machine gets assigned an IP address as if it were a physical device,
+and is able to communicate with other devices on the network. Because TAP
+interfaces are a kernel feature, the resulting network can achieve much better
+performance. Since the virtual machine now appears as any other device on the
+network, we can readily access any service it provides, without needing to
+setup any port forwarding.
+
+First, we have to create a bridge on the host and bring it up.
+```
+# ip link add name br0 type bridge
+# ip link set dev br0 up
+```
+
+Next, we have to assign an interface to the bridge we just created so that it
+knows where to forward received frames. For this, the interface needs to be up.
+Here I am assigning the `eth0` interface to the bridge.
+```
+# ip link set dev eth0 master br0
+```
+
+Having set up the bridge, we now instruct QEMU to use it. Since QEMU 1.1, there
+is a nifty `qemu-bridge-helper` utility that sets up the TAP device
+automagically. Because port forwarding is no longer needed, we can remove the
+`-nic user,hostfwd=tcp::5022-:22` flag. To make QEMU use the `br0` bridge, we
+launch it like this.
+```
+$ qemu-system-arm \
+    ... \
+    -net nic -net bridge,br=br0
+```
+
+To remove the bridge, we can run the following.
+```
+# ip link set dev eth0 nomaster
+# ip link delete dev br0
+```
