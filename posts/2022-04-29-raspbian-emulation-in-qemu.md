@@ -148,6 +148,7 @@ by QEMU.
 
 This has a couple of issues, which may or may not be relevant, depending on the
 use case.
+
 * Because the network emulation happens in the user space, its performance can
   be quite poor.
 * If we want to expose additional services running on the guest machine (like
