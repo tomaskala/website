@@ -8,7 +8,7 @@ a reference to come back to, but perhaps someone will find something useful
 here. I also want to update this document whenever I add anything new.
 
 I keep my configuration in a [git
-repository](https://github.com/tomaskala/server-config). This has been evolving
+repository](https://github.com/tomaskala/infra). This has been evolving
 and changing as I set up more stuff, but now, I'm mostly happy with the overall
 structure.
 
@@ -34,9 +34,11 @@ without caring about whether anyone will be inconvenienced. I mean, *I* will be
 inconvenienced, but I've been inconveniencing myself my whole life, so I'm used
 to it.
 
-I have a pretty strict firewall set up. Debian now uses nftables by default,
-whose configuration is a joy compared to iptables. Except for the web server,
-everything is locked down behind WireGuard (more on that below).
+I have a pretty strict
+[firewall](https://github.com/tomaskala/infra/blob/master/roles/nftables/templates/nftables_dale.conf.j2)
+set up. Debian now uses nftables by default, whose configuration is a joy
+compared to iptables. Except for the web server, everything is locked down
+behind WireGuard (more on that below).
 
 The rest of the post describes the various services that I have running.
 
@@ -128,7 +130,7 @@ my home network, but I wanted something more lightweight for the server. Here I
 don't really need the (admittedly beautiful) frontend.
 
 The result is a small
-[script](https://github.com/tomaskala/server-config/blob/master/roles/unbound/files/fetch-blocklists)
+[script](https://github.com/tomaskala/infra/blob/master/roles/unbound_blocking/files/fetch-blocklists)
 that queries a bunch of blocklists in the `/etc/hosts` file format, converts
 each domain into
 ```
