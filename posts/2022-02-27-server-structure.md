@@ -168,6 +168,11 @@ At the moment, I use
 cronjob that polls the configured websites several times a day, calls the sfeed
 HTML conversion utility, and outputs a static webpage.
 
+> Update 2022/06/15: The RSS reader is unused at the moment. I ran into a
+> couple of issues with sfeed, and am currently looking for an alternative.
+> From time to time, a feed wouldn't get updated, and the frontend wasn't very
+> mobile-friendly.
+
 # Git
 
 I have all my repositories mirrored to the server. This is mostly for backup in
