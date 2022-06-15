@@ -15,9 +15,11 @@ a, a:hover, a:active, a:visited {
 }
 a:link {
   color: #044f3b;
+  text-decoration: underline;
 }
 a:visited {
   color: #044f3b;
+  text-decoration: underline;
 }
 a:focus, a:hover {
   color: #367262;
