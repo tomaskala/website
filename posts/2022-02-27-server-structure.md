@@ -85,6 +85,11 @@ provider, such as [Quad9](https://www.quad9.net/) or
 [Cloudflare](https://www.cloudflare.com/), but so far, I simply recursively
 query the root nameservers. Maybe I'll revisit this in the future.
 
+> Update 2022/06/15: I now forward the DNS queries to Quad9 through DNS over
+> TLS. It's trivial to configure ([assuming one takes care to validate the
+> SNI](https://www.ctrl.blog/entry/unbound-tls-forwarding.html)) and blocks
+> potential malware domains from resolving.
+
 ## DNS leakage prevention
 
 By default, devices use the default (typically DHCP-provided) DNS servers even
