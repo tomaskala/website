@@ -17,7 +17,7 @@ Although I'm Czech, my last name means "fish" in Finnish.
 I love hoarding books at a faster pace than I'm able to read them -- science
 fiction, typically. I also like metal music and gaming, though I usually play
 the same games over and over. I'm a big hummus and coffee enthusiast, and am
-willing to spend absurd amounts of money for them. Finally, I enjoy seeing
+willing to spend absurd amounts of money on them. Finally, I enjoy seeing
 overhyped machine learning technologies fail spectacularly.
 
 # Software preferences
@@ -25,7 +25,7 @@ overhyped machine learning technologies fail spectacularly.
 In general, I dislike software that attempts to be smarter than its user. Such
 efforts fail more often than not, get in the way and feel somewhat insulting.
 Instead, I prefer simple programs that do one thing well and are friendly to
-the system resources. Sadly, this isn't always possible, for instance with web
+system resources. Sadly, this isn't always possible, for instance with web
 browsers or mobile phones.
 
 I browse the web using Firefox, behind a wall of uBlock Origin, Sponsorblock

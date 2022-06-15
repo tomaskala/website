@@ -62,9 +62,9 @@ future post and a future side project, though.
 Finally, there's the topic of my phone. That's actually the primary reason I
 had for setting up the VPN. Due to our corporate security policy, our office
 network is monitored, and only traffic to domains blessed by the powers that be
-is allowed. That's is OK to enforce on company-owned devices like my work
-laptop. But there's no way in hell I'll let anyone monitor or limit what I do
-with my personal phone, so I keep it connected 24/7 with full tunneling.
+is allowed. That's OK to enforce on company-owned devices like my work laptop.
+But there's no way in hell I'll let anyone monitor or limit what I do with my
+personal phone, so I keep it connected 24/7 with full tunneling.
 
 # Unbound
 
@@ -88,8 +88,8 @@ query the root nameservers. Maybe I'll revisit this in the future.
 ## DNS leakage prevention
 
 By default, devices use the default (typically DHCP-provided) DNS servers even
-when connected to a VPN. The queries are tunneled through the VPN tunnel and
-then sent to the DNS server as usual. This means that
+when connected to a VPN. The queries are tunneled through the VPN and then sent
+to the DNS server as usual. This means that
 
 1. The DNS provider can still see which domains I access, and can potentially
    block them or hijack the requests.
