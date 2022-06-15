@@ -1,4 +1,3 @@
-.POSIX:
 .SUFFIXES:
 
 PANDOC_ARGS = --template parts/template.html -B parts/header.html -A parts/footer.html --standalone --shift-heading-level-by 1
