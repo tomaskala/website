@@ -1,23 +1,23 @@
 ---
-title: Overlay network
-date: TODO
+title: Overlay network configuration
+date: 2022/06/16
 ---
 
 The next step in my nerdy networking hobby was to expand my [server
 configuration](https://tomaskala.com/posts/2022-02-27-server-structure) to
-allow access to my home network. Naturally, this involves setting up a VPN and
-some way to access it from outside the network.
+allow remote access to my home network. Naturally, this involved setting up a
+VPN and some way to access it from outside the network, among other things.
 
 The motivation is to be able to access my NAS for backups and the nice [web
-UI](https://github.com/navidrome/navidrome) over my music collection. In
-future, I'll most likely include more services.
+UI](https://github.com/navidrome/navidrome) that I set up over my music
+collection. In future, I'll most likely include more services.
 
 I decided to go a step further and set up a kind of an [overlay
 network](https://en.wikipedia.org/wiki/Overlay_network). That way, all my
 devices will be able to talk to each other and to any device at home,
 regardless of where they are. In addition, I can grant access to my family
 members' devices so that they can use any service the network provides, while
-being separated from my devices.
+being separable from my devices by putting them on different subnets.
 
 # Connecting to the home network
 
@@ -36,22 +36,23 @@ network. There are a few ways to achieve that:
   too much like relying on external services only to connect to my home.
 * **Connecting through another server.** Finally, I settled on this solution. A
   WireGuard peer running at home will connect to my server, just like any other
-  peer. Since WireGuard doesn't distinguish clients and servers (though the
-  terminology often slips), all peers are equal. The server will take care of
-  routing packets destined to the home network to the correct peer, which will
-  act as a gateway.
+  peer. Since WireGuard doesn't distinguish between clients and servers (though
+  the terminology often slips), all peers are equal. The server will take care
+  of routing packets destined to the home network through the correct peer,
+  which will act as a gateway.
 
 The gateway is, unsurprisingly, a Raspberry Pi. Normally, one would install
 WireGuard on their router, but I'm running a MikroTik device, and their
-RouterOS won't support WireGuard until version 7 (which is not exactly stable
-at the time of writing).
+RouterOS won't support WireGuard until version 7 (which isn't exactly stable at
+the time of writing).
 
 The Raspberry must be configured to act as a router. This means that IP
 forwarding must be enabled, and the correct firewall rules must be in place.
-This is similar to the server configuration described below.
+This is similar to the server configuration described below. Furthermore, a
+keepalive setting is necessary to keep the NAT mapping open.
 
-In addition, the `AllowedIPs` section of all peers' WireGuard config must be
-set so that access to the entire private network is allowed.
+In addition, the `AllowedIPs` section of all peers' WireGuard configs must be
+set to allow access to the entire private network range.
 
 # Implementation
 
@@ -60,24 +61,21 @@ service](https://github.com/tomaskala/infra/blob/master/roles/overlay_network/fi
 running on my server. The service controls a [shell
 script](https://github.com/tomaskala/infra/blob/master/roles/overlay_network/files/overlay-network)
 that sets up the network components based on a configuration file described
-below. The scripts really only accepts two commands: one to set up the network,
+below. The script really only accepts two commands: one to set up the network,
 the other to tear it down.
 
-Because the scripts only sets up a couple of system options, a service isn't
+Because the script only sets up a couple of system options, a service isn't
 strictly necessary. However, it provides me with more control over its runtime,
 allowing me to easily launch it on startup or stop when necessary. Such kind of
 service that only launches a particular program is known as a oneshot service.
-
-I shamelessly stole this idea from my colleague Tomas Drtina, whom I hereby
-thank kindly.
 
 # Network structure
 
 The structure of the entire network is configured in a [JSON
 file](https://github.com/tomaskala/infra/blob/master/roles/overlay_network/files/overlay-network.json)
-that contains the IPv4 and IPv6 ranges of all subnets as well as local DNS
-entries. The control script uses [jq](https://stedolan.github.io/jq/) to
-extract the individual entries.
+that contains the IPv4 and IPv6 ranges of all subnets, IP addresses of the
+gateway, and local DNS entries. The control script uses
+[jq](https://stedolan.github.io/jq/) to extract the individual entries.
 
 Schematically, the network looks like this (created using
 [asciiflow.com](https://asciiflow.com)).
@@ -98,15 +96,15 @@ Schematically, the network looks like this (created using
       └─────────────┘
 ```
 
-* The *Internal subnet* subnet contains my devices with full access to the
-  entire network, including full tunneling.
-* The *Isolated subnet* subnet is reserved for devices of family members. These
-  are trusted in the sense that they can use the server as a router to get to
-  the home network through, as well as access the services running directly on
-  the server. They cannot be configured for full tunneling, though (enforced by
+* The *Internal subnet* contains my devices with full access to the entire
+  network, including full tunneling.
+* The *Isolated subnet* is reserved for devices of family members. These are
+  trusted in the sense that they can access both the server and the home
+  network. They cannot be configured for full tunneling, though (enforced by
   the firewall rules described below). This is so that I don't get banned from
   my VPS provider for network activity beyond my control.
-* The *Home gateway* is the Raspberry Pi directly connected to the server.
+* The *Home gateway* is the Raspberry Pi connected to the server through the
+  VPN.
 * The *Home subnet* runs the services accessible from all devices in the
   network.
 
@@ -119,7 +117,8 @@ starting, and in the reverse order when stopping the network service.
 ## Nftables entries
 
 First, nftables must be configured in the following way (in addition to the
-already configured rules).
+already configured rules; input to the server is already allowed from the
+WireGuard interface).
 
 * Allow forwarding packets from *Internal subnet* to the Internet.
 * Allow forwarding packets from *Internal subnet* back to *Internal subnet*.
@@ -152,13 +151,13 @@ for a private IP address. Using a self-signed certificate is of no help,
 because then the browsers just complain about it being untrusted.
 
 I could reserve a special subdomain of my domain for the home network, get a
-Let's Encrypt certificate for that, and enjoy my complaint-free web browser
+Let's Encrypt certificate for that, and enjoy my complaint-free web browsing
 experience. My domain is a bit too long as it is, though, and going through
 this hassle only to make browsers happy is not worth it.
 
 In the end, I simply didn't configure any certificate at all and I hope that
 the HTTPS everywhere Firefox mode won't become mandatory. In turn, this allows
-me to use the reserver
+me to use the reserved
 [home.arpa.](https://datatracker.ietf.org/doc/html/rfc8375) domain. And no, the
 `local.` domain that my NAS insists of using is [not suitable for this
 use](https://www.ctrl.blog/entry/homenet-domain-name.html).
