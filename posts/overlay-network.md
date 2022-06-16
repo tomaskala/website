@@ -46,7 +46,12 @@ WireGuard on their router, but I'm running a MikroTik device, and their
 RouterOS won't support WireGuard until version 7 (which is not exactly stable
 at the time of writing).
 
-# TODO: Configuring RPI as a router. Maybe create the ansible role and link it here?
+The Raspberry must be configured to act as a router. This means that IP
+forwarding must be enabled, and the correct firewall rules must be in place.
+This is similar to the server configuration described below.
+
+In addition, the `AllowedIPs` section of all peers' WireGuard config must be
+set so that access to the entire private network is allowed.
 
 # Implementation
 
@@ -105,20 +110,66 @@ Schematically, the network looks like this (created using
 * The *Home subnet* runs the services accessible from all devices in the
   network.
 
-TODO: Why not keep wireguard keys in the config.
-TODO: Changing the internal IP address pool?
+# Network configuration components
 
-Set AllowedIPs to the private subnet for all peers.
+The remainder of this posts describes what needs to be done to setup the
+network control on the server. The steps are performed in this order when
+starting, and in the reverse order when stopping the network service.
 
-# Nftables entries
+## Nftables entries
 
-TODO: Describe the rules that make sure full tunneling is not possible from the
-isolated network.
+First, nftables must be configured in the following way (in addition to the
+already configured rules).
 
-# Local DNS
+* Allow forwarding packets from *Internal subnet* to the Internet.
+* Allow forwarding packets from *Internal subnet* back to *Internal subnet*.
+* Allow forwarding packets from *Isolated subnet* back to *Isolated subnet*.
+* Allow forwarding packets from the WireGuard interface to the *Home subnet*.
+* Drop everything else.
 
-TODO: The trouble with TLS certificates on private domains.
+I tried a few different ways, and eventually settled on pre-configuring empty
+sets of IP addresses and address ranges, and the above forwarding rules. The
+network control script then simply fills the sets with the correct entries when
+starting the service, and flushes them when stopping it.
 
-# IP forwarding
+## Local DNS
 
-# IP routes
+The next step is to configure the Unbound resolver to resolve local domains to
+the correct IP addresses. This is done by creating a file with the local DNS
+records inside the `/etc/unbound/unbound.conf.d` directory, whose content is
+set to be automatically included in my [Unbound
+config](https://github.com/tomaskala/infra/blob/master/roles/unbound/templates/unbound.conf.j2).
+
+There's an unfortunate situation around TLS certificates. Modern browsers sound
+all kinds of alarms when they access a domain with no certificate configured,
+regardless of whether the IP address is in an [RFC
+1918](https://www.rfc-editor.org/rfc/rfc1918)-reserved range or not.
+
+Of course, a TLS certificate for a site only accessible by trusted computers
+in a home network or through a VPN is hardly necessary, but tell that to the
+browsers. Naturally, it's not possible to obtain a Let's Encrypt certificate
+for a private IP address. Using a self-signed certificate is of no help,
+because then the browsers just complain about it being untrusted.
+
+I could reserve a special subdomain of my domain for the home network, get a
+Let's Encrypt certificate for that, and enjoy my complaint-free web browser
+experience. My domain is a bit too long as it is, though, and going through
+this hassle only to make browsers happy is not worth it.
+
+In the end, I simply didn't configure any certificate at all and I hope that
+the HTTPS everywhere Firefox mode won't become mandatory. In turn, this allows
+me to use the reserver
+[home.arpa.](https://datatracker.ietf.org/doc/html/rfc8375) domain. And no, the
+`local.` domain that my NAS insists of using is [not suitable for this
+use](https://www.ctrl.blog/entry/homenet-domain-name.html).
+
+## IP forwarding
+
+This step simply enables IPv4 and IPv6 forwarding by setting the
+`net.ipv4.ip_forward` and `net.ipv6.conf.all.forwarding` kernel parameters
+using the `sysctl` utility.
+
+## IP routes
+
+Finally, IP routes are set so that all packets for the *Home subnet* are routed
+via the *Home gateway*.
