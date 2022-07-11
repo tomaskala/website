@@ -31,8 +31,7 @@ browsers or mobile phones.
 I browse the web using Firefox, behind a wall of uBlock Origin, Sponsorblock
 and my Pi-hole instance.
 
-My favorite text editor is vim. Neovim, to be exact, although I don't use any
-of its IDE-like capabilities. I use it in combination with tmux and a window
+My favorite text editor is vim. I use it in combination with tmux and a window
 manager: dwm or sway. After more than 8 years of using it, I can confidently
 say that I don't know almost anything about it.
 
