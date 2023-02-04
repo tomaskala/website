@@ -175,6 +175,11 @@ HTML conversion utility, and outputs a static webpage.
 > From time to time, a feed wouldn't get updated, and the frontend wasn't very
 > mobile-friendly.
 
+> Update 2023/02/04: I replaced sfeed with 
+> [yarr](https://github.com/nkanaev/yarr). This is a delightfully simple feed 
+> reader deployed as a standalone binary with an intuitive frontend. I am 
+> really happy about it.
+
 # Git
 
 I have all my repositories mirrored to the server. This is mostly for backup in
