@@ -180,7 +180,7 @@ Make `/tmp` a RAM disk for increased speed and reduced SSD wear:
 First, use `pacstrap` to install the `base` package, the Linux kernel and 
 firmware. When that's done, chroot into the newly installed system.
 ```
-# pacstrap -i /mnt base linux linux-firmware
+# pacstrap -i /mnt base base-devel linux linux-firmware
 # arch-chroot /mnt
 ```
 
