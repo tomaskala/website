@@ -21,7 +21,7 @@ clean:
 
 .PHONY: sync
 sync:
-	rsync -auzv --exclude .git --include '*/' --include '*.html' --include 'parts/*.html' --include 'static/*' --include 'posts/*.html' --exclude '*' . dale:/var/www/tomaskala.com
+	rsync -auzv --exclude .git --include '*/' --include '*.html' --include 'parts/*.html' --include 'static/*' --include 'posts/*.html' --exclude '*' . whitelodge:/var/www/tomaskala.com
 
 .SUFFIXES: .md .html
 .md.html:
