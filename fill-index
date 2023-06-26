@@ -12,9 +12,7 @@ find posts -maxdepth 1 -type f -name '*.md' | sort -r | while read -r f; do
   title=$(sed -n 's/^title: *\(.*\)$/\1/p' "${f}")
   published=$(sed -n 's|^date: *\([0-9]\{4\}/[0-9]\{2\}/[0-9]\{2\}\)$|\1|p' "${f}")
 
-  # No .html extension: assumes that nginx knows how to append it.
-  # This makes for nicer looking URLs.
-  html="${f%.md}"
+  html="${f%.md}.html"
   printf '* %s :: [%s](%s)\n' "${published}" "${title}" "${html}" >> index.md
 
   if [ -z "${datepart}" ]; then
