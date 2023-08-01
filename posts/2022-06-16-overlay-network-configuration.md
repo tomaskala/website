@@ -24,17 +24,17 @@ being separable from my devices by putting them on different subnets.
 The first thing that needs to be addressed is how to actually access the home
 network. There are a few ways to achieve that:
 
-* **Public IP address.** My ISP actually does offer that, both IPv4 and IPv6!
+- **Public IP address.** My ISP actually does offer that, both IPv4 and IPv6!
   But you need to pay extra, and if I ever decided to change the ISP (or they
   changed their services), I would lose this option. More importantly, I didn't
   feel like requesting a public IP address for something that's essentially a
   playground.
-* **Dynamic DNS.** Another option is to reserve a subdomain of [my
+- **Dynamic DNS.** Another option is to reserve a subdomain of [my
   domain](tomaskala.com) and to configure [dynamic
   DNS](https://en.wikipedia.org/wiki/Dynamic_DNS) for that subdomain. My DNS
   provider allows that (how lucky I am with providers!), but this felt a bit
   too much like relying on external services only to connect to my home.
-* **Connecting through another server.** Finally, I settled on this solution. A
+- **Connecting through another server.** Finally, I settled on this solution. A
   WireGuard peer running at home will connect to my server, just like any other
   peer. Since WireGuard doesn't distinguish between clients and servers (though
   the terminology often slips), all peers are equal. The server will take care
@@ -96,16 +96,16 @@ Schematically, the network looks like this (created using
       └─────────────┘
 ```
 
-* The *Internal subnet* contains my devices with full access to the entire
+- The *Internal subnet* contains my devices with full access to the entire
   network, including full tunneling.
-* The *Isolated subnet* is reserved for devices of family members. These are
+- The *Isolated subnet* is reserved for devices of family members. These are
   trusted in the sense that they can access both the server and the home
   network. They cannot be configured for full tunneling, though (enforced by
   the firewall rules described below). This is so that I don't get banned from
   my VPS provider for network activity beyond my control.
-* The *Home gateway* is the Raspberry Pi connected to the server through the
+- The *Home gateway* is the Raspberry Pi connected to the server through the
   VPN.
-* The *Home subnet* runs the services accessible from all devices in the
+- The *Home subnet* runs the services accessible from all devices in the
   network.
 
 # Network configuration components
@@ -120,11 +120,11 @@ First, nftables must be configured in the following way (in addition to the
 already configured rules; input to the server is already allowed from the
 WireGuard interface).
 
-* Allow forwarding packets from *Internal subnet* to the Internet.
-* Allow forwarding packets from *Internal subnet* back to *Internal subnet*.
-* Allow forwarding packets from *Isolated subnet* back to *Isolated subnet*.
-* Allow forwarding packets from the WireGuard interface to the *Home subnet*.
-* Drop everything else.
+- Allow forwarding packets from *Internal subnet* to the Internet.
+- Allow forwarding packets from *Internal subnet* back to *Internal subnet*.
+- Allow forwarding packets from *Isolated subnet* back to *Isolated subnet*.
+- Allow forwarding packets from the WireGuard interface to the *Home subnet*.
+- Drop everything else.
 
 I tried a few different ways, and eventually settled on pre-configuring empty
 sets of IP addresses and address ranges, and the above forwarding rules. The

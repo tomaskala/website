@@ -29,11 +29,11 @@ machine, so that Ansible can be tested.
 
 # Preparation
 
-* Install QEMU.
+- Install QEMU.
   ```
   # pacman -S qemu-full qemu-emulators-full
   ```
-* Download a QEMU kernel and a DTB file (containing the hardware description)
+- Download a QEMU kernel and a DTB file (containing the hardware description)
   from
   [dhruvvyas90/qemu-rpi-kernel](https://github.com/dhruvvyas90/qemu-rpi-kernel).
   The reason for this is that the Raspbian-bundled kernel has been compiled
@@ -42,7 +42,7 @@ machine, so that Ansible can be tested.
   Versatile development
   board](https://developer.arm.com/tools-and-software/development-boards),
   which QEMU supports.
-* Download the most-recent Raspbian-Lite image from the [official
+- Download the most-recent Raspbian-Lite image from the [official
   website](https://www.raspberrypi.com/). Note that (at the time of writing)
   the kernels in the above link require a 32bit Raspbian.
 
@@ -51,10 +51,10 @@ machine, so that Ansible can be tested.
 The image contains the boot partition and the root partition. We need to mount
 both of them.
 
-* Recently, the default `pi` user with the `raspberry` password was removed for
+- Recently, the default `pi` user with the `raspberry` password was removed for
   security reasons. Because we are doing a headless setup, we need to define
   the admin user in a special file inside the boot partition.
-* We have to disable loading of additional shared libraries in the root
+- We have to disable loading of additional shared libraries in the root
   partition.
 
 To mount both partitions, run the following.
@@ -115,17 +115,17 @@ $ qemu-system-arm \
 ```
 The meaning of the parameters is as follows.
 
-* `-no-reboot`: Exit on error instead of rebooting.
-* `-machine versatilepb -cpu arm1176 -m 256`: Set the emulated machine, its CPU
+- `-no-reboot`: Exit on error instead of rebooting.
+- `-machine versatilepb -cpu arm1176 -m 256`: Set the emulated machine, its CPU
   and the amount of memory (256MB is the maximum for versatilepb).
-* `-kernel kernel-qemu-5.10.63-bullseye`: Set the kernel.
-* `-dtb versatile-pb-bullseye-5.10.63.dtb`: Set the device tree.
-* `-drive format=qcow2,file=raspbian-bullseye-lite.qcow2`: Set the drive image.
-* `-append "root=/dev/sda2 panic=1 rootfstype=ext4 rw"`: Set the root partition
+- `-kernel kernel-qemu-5.10.63-bullseye`: Set the kernel.
+- `-dtb versatile-pb-bullseye-5.10.63.dtb`: Set the device tree.
+- `-drive format=qcow2,file=raspbian-bullseye-lite.qcow2`: Set the drive image.
+- `-append "root=/dev/sda2 panic=1 rootfstype=ext4 rw"`: Set the root partition
   and its file system type.
-* `-nographic`: Do not display the QEMU GUI, since we are running Raspbian Lite
+- `-nographic`: Do not display the QEMU GUI, since we are running Raspbian Lite
   anyway.
-* `-nic user,hostfwd=tcp::5022-:22`: Forward the host port 5022 to the guest
+- `-nic user,hostfwd=tcp::5022-:22`: Forward the host port 5022 to the guest
   port 22.
 
 # SSH connection
@@ -149,9 +149,9 @@ by QEMU.
 This has a couple of issues, which may or may not be relevant, depending on the
 use case.
 
-* Because the network emulation happens in the user space, its performance can
+- Because the network emulation happens in the user space, its performance can
   be quite poor.
-* If we want to expose additional services running on the guest machine (like
+- If we want to expose additional services running on the guest machine (like
   we do with SSH above), we must shutdown the machine and relaunch it with
   additional forwarding arguments to QEMU.
 

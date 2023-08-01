@@ -13,7 +13,7 @@ find posts -maxdepth 1 -type f -name '*.md' | sort -r | while read -r f; do
   published=$(sed -n 's|^date: *\([0-9]\{4\}/[0-9]\{2\}/[0-9]\{2\}\)$|\1|p' "${f}")
 
   html="${f%.md}.html"
-  printf '* %s :: [%s](%s)\n' "${published}" "${title}" "${html}" >> index.md
+  printf -- '- %s :: [%s](%s)\n' "${published}" "${title}" "${html}" >> index.md
 
   if [ -z "${datepart}" ]; then
     printf 'WARNING: No date found in file name %s\n' "${f}" >&2

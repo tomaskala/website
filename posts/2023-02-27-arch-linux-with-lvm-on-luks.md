@@ -50,36 +50,36 @@ on this device and start partitioning.
 
 First, create a 600M EFI partition:
 
-* `n` (new partition)
-* `Enter` (accept the default partition type)
-* `Enter` (accept the default partition number)
-* `Enter` (accept the default first sector)
-* `+600M` (partition size)
-* `t` (partition type)
-* `Enter` (accept the default partition number)
-* `ef` (EFI)
+- `n` (new partition)
+- `Enter` (accept the default partition type)
+- `Enter` (accept the default partition number)
+- `Enter` (accept the default first sector)
+- `+600M` (partition size)
+- `t` (partition type)
+- `Enter` (accept the default partition number)
+- `ef` (EFI)
 
 Next, create a 1G boot partition:
 
-* `n`
-* `Enter`
-* `Enter`
-* `Enter`
-* `+1G`
-* `t`
-* `Enter`
-* `83` (Linux)
+- `n`
+- `Enter`
+- `Enter`
+- `Enter`
+- `+1G`
+- `t`
+- `Enter`
+- `83` (Linux)
 
 Finally, create the LVM partition taking up the remaining space:
 
-* `n`
-* `Enter`
-* `Enter`
-* `Enter`
-* `Enter`
-* `t`
-* `Enter`
-* `8e` (Linux LVM)
+- `n`
+- `Enter`
+- `Enter`
+- `Enter`
+- `Enter`
+- `t`
+- `Enter`
+- `8e` (Linux LVM)
 
 Check that everything is OK by typing `p`. Write the changes by typing `w`.
 

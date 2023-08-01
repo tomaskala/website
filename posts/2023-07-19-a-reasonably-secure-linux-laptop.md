@@ -11,12 +11,12 @@ up. This time, I wanted to do this right.
 
 I put together a list of things I wanted...
 
-* Full-disk encryption using LUKS2
-* Storing the encryption keys on the TPM chip
-* Secure boot
-* systemd-boot (this has nothing to do with security, but systemd-boot is much 
+- Full-disk encryption using LUKS2
+- Storing the encryption keys on the TPM chip
+- Secure boot
+- systemd-boot (this has nothing to do with security, but systemd-boot is much 
   more light-weight than GRUB)
-* Password-protected firmware (this is necessary for secure boot to make sense, 
+- Password-protected firmware (this is necessary for secure boot to make sense, 
   otherwise, I could just enter setup and disable secure boot entirely)
 
 ...and spent the following several days reading the Arch wiki, various blog 
@@ -35,7 +35,7 @@ section on the Arch wiki proved the most useful, as it described pretty much
 the same setup that I had in mind. There are a few tweaks I had to make, but 
 all in all, it was a surprisingly smooth process.
 
-* I'm using `systemd-boot-update.service` to automatically update systemd-boot 
+- I'm using `systemd-boot-update.service` to automatically update systemd-boot 
   after booting if necessary. I was wondering how that plays along with `sbctl` 
   to automatically sign the bootloader after the update. The issue is that, by 
   default, `sbctl` would re-sign the bootloader upon `pacman` update, but that 
@@ -47,7 +47,7 @@ all in all, it was a surprisingly smooth process.
   the exact command needed to ensure that the bootloader gets signed, but it 
   took me a while to realize that `sbctl` saves the output file in its DB and 
   provides it to its pacman hook.
-* Since the LUKS key is bound to the TPM PCR 7 (holding the secure boot state), 
+- Since the LUKS key is bound to the TPM PCR 7 (holding the secure boot state), 
   whenever secure boot status is changed, the key gets invalidated. In other 
   words, once I enabled secure boot, I had to manually type the excruciatingly 
   long recovery key instead of having TPM unlock the drive for me. What's 
@@ -63,16 +63,16 @@ passphrase, and the drive unlocks automatically. It did seem a little off at
 first, like I was losing some degree of security. I had to convince myself that 
 it's OK:
 
-* It's still necessary to enter a login password to, well, log in. That way, 
+- It's still necessary to enter a login password to, well, log in. That way, 
   assuming a reasonable password choice, the laptop is still locked to 
   outsiders.
-* Since the TPM is on the motherboard, removing the drive and putting it into 
+- Since the TPM is on the motherboard, removing the drive and putting it into 
   another machine cannot lead to the drive getting unlocked.
-* Since the firmware is password-protected, it's not possible to boot from 
+- Since the firmware is password-protected, it's not possible to boot from 
   another medium to analyze the drive or tamper with the system.
-  * The former is also impossible due to full-disk encryption.
-  * The latter is likewise impossible due to secure boot.
-* This is almost exactly the security scheme used by Android. Notice that even 
+  - The former is also impossible due to full-disk encryption.
+  - The latter is likewise impossible due to secure boot.
+- This is almost exactly the security scheme used by Android. Notice that even 
   if you're encrypting your Android system, you're not prompted for a 
   decryption passphrase during system boot.
 
