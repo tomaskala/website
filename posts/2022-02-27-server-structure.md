@@ -7,8 +7,13 @@ In this post, I want to document my server structure. Mostly for myself to have
 a reference to come back to, but perhaps someone will find something useful
 here. I also want to update this document whenever I add anything new.
 
+> Update 2023/08/16: I have since switched the server to NixOS. Although I 
+> still run most of the services below, the Ansible-related bits are no longer 
+> valid. I might write a new post about NixOS experience, but this post is now 
+> obsolete.
+
 I keep my configuration in a [git
-repository](https://github.com/tomaskala/infra). This has been evolving
+repository](https://github.com/tomaskala/infra/tree/6bf2b6d4914edd2d4bbd2e04604ea90f2c20519e). This has been evolving
 and changing as I set up more stuff, but now, I'm mostly happy with the overall
 structure.
 
@@ -16,13 +21,12 @@ At first, the repo was just a bunch of loose configuration files and a long
 `README.md` describing how to set the whole thing up. This scaled poorly, and
 required me to write a short novel every time I decided to add a new service.
 
-Recently, I made the (painful) switch to [Ansible](https://www.ansible.com/).
-Painful, because I really dislike writing YAML for configuration. It always
-feels like trying to emulate a proper programming language in a config format
-with an ugly syntax and a
-[joke](https://www.bram.us/2022/01/11/yaml-the-norway-problem) of a semantics.
-On the other hand, I now have the entire configuration specified in a
-declarative way, and can go from zero to a fully configured server in a matter
+Recently, I made the (painful) switch to Ansible. Painful, because I really 
+dislike writing YAML for configuration. It always feels like trying to emulate 
+a proper programming language in a config format with an ugly syntax and a 
+[joke](https://www.bram.us/2022/01/11/yaml-the-norway-problem) of a semantics. 
+On the other hand, I now have the entire configuration specified in a 
+declarative way, and can go from zero to a fully configured server in a matter 
 of minutes.
 
 The server itself is a pretty standard VPS running Debian. I tend to name my
@@ -35,7 +39,7 @@ inconvenienced, but I've been inconveniencing myself my whole life, so I'm used
 to it.
 
 I have a pretty strict
-[firewall](https://github.com/tomaskala/infra/blob/master/roles/nftables/templates/nftables_dale.conf.j2)
+[firewall](https://github.com/tomaskala/infra/blob/6bf2b6d4914edd2d4bbd2e04604ea90f2c20519e/roles/nftables/templates/nftables_dale.conf.j2)
 set up. Debian now uses nftables by default, whose configuration is a joy
 compared to iptables. Except for the web server, everything is locked down
 behind WireGuard (more on that below).
@@ -130,17 +134,14 @@ my home network, but I wanted something more lightweight for the server. Here I
 don't really need the (admittedly beautiful) frontend.
 
 The result is a small
-[script](https://github.com/tomaskala/infra/blob/master/roles/unbound_blocking/files/fetch-blocklists)
+[script](https://github.com/tomaskala/infra/blob/6bf2b6d4914edd2d4bbd2e04604ea90f2c20519e/roles/unbound_blocking/files/dns-blocklist/fetch-blocklist.py)
 that queries a bunch of blocklists in the `/etc/hosts` file format, converts
 each domain into
 ```
-local-zone: "<domain>." redirect
-local-data: "<domain>. A 0.0.0.0"
+"<domain>." always_null
 ```
-and outputs an Unbound-compatible configuration sourced by the main
-config. The whole thing runs as a weekly cronjob to ensure the lists are up to
-date. By using the `redirect` zone type (as opposed to `deny` or `refuse`), all
-subdomains of each domain are dropped as well.
+and feeds those to Unbound through the `unbound-control` program. The whole 
+thing runs as a weekly cronjob to ensure the lists are up to date.
 
 In the past, I attempted for something similar on my computer using the
 `/etc/hosts` file. It turns out that the hosts file is [sequentially
@@ -148,7 +149,7 @@ scanned](https://unix.stackexchange.com/questions/588184/what-will-happen-if-i-a
 every time the a request is made, which is quite slow with large blocklists. I
 wanted to be sure that nothing like that happens in Unbound. Luckily, Unbound
 processes local zones [using a red-black
-tree](https://github.com/NLnetLabs/unbound/blob/master/services/localzone.c).
+tree](https://github.com/NLnetLabs/unbound/blob/d4145772b57a7dc69afccc7ddcd80aa1e7ffc9bd/services/localzone.c).
 
 # Nginx
 
