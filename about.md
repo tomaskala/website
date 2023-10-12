@@ -35,9 +35,6 @@ My favorite text editor is vim. I use it in combination with tmux and a window
 manager: i3 or sway. After more than 8 years of using vim, I can confidently
 say that I don't know almost anything about it.
 
-I use neomutt for reading email, mpv for watching videos, and a custom wrapper
-around music player daemon for listening to music.
-
 My preferred programming languages are C, Go and Lua. I don't use any of them 
 at my day job, but I typically develop my hobby projects in one of these.
 
