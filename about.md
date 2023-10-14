@@ -44,4 +44,4 @@ Raspberry Pis. My mobile phone runs GrapheneOS.
 
 # Contact
 
-You can contact me using my [public email](mailto:public@tomaskala.com).
+You can contact me using my [public email](mailto:contact@tomaskala.com).
