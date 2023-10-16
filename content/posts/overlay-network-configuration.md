@@ -1,16 +1,16 @@
----
-title: Overlay network configuration
-date: 2022/06/16
----
++++
+title = 'Overlay Network Configuration'
+date = 2022-06-16T20:10:32+02:00
++++
 
 The next step in my nerdy networking hobby was to expand my [server
-configuration](https://tomaskala.com/posts/2022-02-27-server-structure) to
+configuration](/posts/my-server-structure/) to
 allow remote access to my home network. Naturally, this involved setting up a
 VPN and some way to access it from outside the network, among other things.
 
-The motivation is to be able to access my NAS for backups and the nice [web
-UI](https://github.com/navidrome/navidrome) that I set up over my music
-collection. In future, I'll most likely include more services.
+The motivation is to be able to access my NAS for backups and 
+[Navidrome](https://www.navidrome.org/) for playing my music collection 
+remotely. In future, I'll most likely include more services.
 
 I decided to go a step further and set up a kind of an [overlay
 network](https://en.wikipedia.org/wiki/Overlay_network). That way, all my
@@ -30,7 +30,7 @@ network. There are a few ways to achieve that:
   feel like requesting a public IP address for something that's essentially a
   playground.
 - **Dynamic DNS.** Another option is to reserve a subdomain of [my
-  domain](tomaskala.com) and to configure [dynamic
+  domain](https://tomaskala.com) and to configure [dynamic
   DNS](https://en.wikipedia.org/wiki/Dynamic_DNS) for that subdomain. My DNS
   provider allows that (how lucky I am with providers!), but this felt a bit
   too much like relying on external services only to connect to my home.
@@ -57,9 +57,9 @@ set to allow access to the entire private network range.
 # Implementation
 
 The network configuration is implemented as a [systemd
-service](https://github.com/tomaskala/infra/blob/master/roles/overlay_network/files/overlay-network.service)
+service](https://github.com/tomaskala/infra/blob/6bf2b6d4914edd2d4bbd2e04604ea90f2c20519e/roles/overlay_network/files/overlay-network.service)
 running on my server. The service controls a [shell
-script](https://github.com/tomaskala/infra/blob/master/roles/overlay_network/files/overlay-network)
+script](https://github.com/tomaskala/infra/blob/6bf2b6d4914edd2d4bbd2e04604ea90f2c20519e/roles/overlay_network/files/overlay-network)
 that sets up the network components based on a configuration file described
 below. The script really only accepts two commands: one to set up the network,
 the other to tear it down.
@@ -72,28 +72,28 @@ service that only launches a particular program is known as a oneshot service.
 # Network structure
 
 The structure of the entire network is configured in a [JSON
-file](https://github.com/tomaskala/infra/blob/master/roles/overlay_network/files/overlay-network.json)
+file](https://github.com/tomaskala/infra/blob/6bf2b6d4914edd2d4bbd2e04604ea90f2c20519e/roles/overlay_network/files/overlay-network.json)
 that contains the IPv4 and IPv6 ranges of all subnets, IP addresses of the
 gateway, and local DNS entries. The control script uses
 [jq](https://stedolan.github.io/jq/) to extract the individual entries.
 
-Schematically, the network looks like this (created using
-[asciiflow.com](https://asciiflow.com)).
-```
-                     ┌─────────────────┐
-        ┌────────┐ ┌─┤ Internal subnet │
-        │        ├─┘ └─────────────────┘
-        │ Server │
-        │        ├─┐ ┌─────────────────┐
-        └────┬───┘ └─┤ Isolated subnet │
-             │       └─────────────────┘
-     ┌───────┴──────┐
-     │ Home gateway │
-     └───────┬──────┘
-             │      
-      ┌──────┴──────┐
-      │ Home subnet │
-      └─────────────┘
+Schematically, the network looks like this:
+```goat
+                     +-----------------+
+        +--------+ +-+ Internal subnet |
+        |        +-+ +-----------------+
+        | Server |
+        |        +-+ +-----------------+
+        +----+---+ +-+ Isolated subnet |
+             |       +-----------------+
+             |
+     +-------+------+
+     | Home gateway |
+     +-------+------+
+             |      
+      +------+------+
+      | Home subnet |
+      +-------------+
 ```
 
 - The *Internal subnet* contains my devices with full access to the entire
@@ -137,7 +137,7 @@ The next step is to configure the Unbound resolver to resolve local domains to
 the correct IP addresses. This is done by creating a file with the local DNS
 records inside the `/etc/unbound/unbound.conf.d` directory, whose content is
 set to be automatically included in my [Unbound
-config](https://github.com/tomaskala/infra/blob/master/roles/unbound/templates/unbound.conf.j2).
+config](https://github.com/tomaskala/infra/blob/6bf2b6d4914edd2d4bbd2e04604ea90f2c20519e/roles/unbound/templates/unbound.conf.j2).
 
 There's an unfortunate situation around TLS certificates. Modern browsers sound
 all kinds of alarms when they access a domain with no certificate configured,
@@ -158,9 +158,9 @@ this hassle only to make browsers happy is not worth it.
 In the end, I simply didn't configure any certificate at all and I hope that
 the HTTPS everywhere Firefox mode won't become mandatory. In turn, this allows
 me to use the reserved
-[home.arpa.](https://datatracker.ietf.org/doc/html/rfc8375) domain. And no, the
-`local.` domain that my NAS insists of using is [not suitable for this
-use](https://www.ctrl.blog/entry/homenet-domain-name.html).
+[.home.arpa](https://datatracker.ietf.org/doc/html/rfc8375) domain. I saw that 
+people often use the `.local` domain, but that's actually [reserved for 
+mDNS](https://www.ctrl.blog/entry/homenet-domain-name.html).
 
 ## IP forwarding
 
@@ -170,5 +170,5 @@ using the `sysctl` utility.
 
 ## IP routes
 
-Finally, IP routes are set so that all packets for the *Home subnet* are routed
-via the *Home gateway*.
+Finally, IP routes are set so that all packets for the home subnet are routed
+via the home gateway.

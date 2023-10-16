@@ -1,6 +1,8 @@
----
-title: About
----
++++
+title = 'About'
+date = 2023-10-16T15:18:47+02:00
+norss = true
++++
 
 I'm Tomas. I have experience in programming (Python, Scala, Haskell, Nix, shell 
 scripting), Linux system administration, computer networking, and statistical 

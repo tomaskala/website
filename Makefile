@@ -1,28 +1,14 @@
+.POSIX:
 .SUFFIXES:
 
-PANDOC_ARGS = --template parts/template.html -B parts/header.html -A parts/footer.html --standalone --shift-heading-level-by 1
-PARTS = $(shell ls parts/*.html)
-MARKDOWN = $(shell find . -type f -not -name 'README.md' -name '*.md')
-HTML = $(MARKDOWN:.md=.html)
-HTML += index.html
-
-.PHONY: all
-all: $(HTML)
-
-$(HTML): $(PARTS)
-
-index.md: fill-index
-	./fill-index
+.PHONY: build
+build:
+	hugo
 
 .PHONY: clean
 clean:
-	find . -type f -not -path './parts/*' -name '*.html' -exec rm {} \+
-	rm -f index.md
+	rm -r public
 
 .PHONY: sync
-sync:
-	rsync -auzv --exclude .git --include '*/' --include '*.html' --include 'parts/*.html' --include 'static/*' --include 'img/*' --include 'posts/*.html' --exclude '*' . whitelodge:/var/www/tomaskala.com
-
-.SUFFIXES: .md .html
-.md.html:
-	pandoc --from markdown --to html $(PANDOC_ARGS) $< -o $@
+sync: build
+	rsync -auzv --delete public/ whitelodge:/var/www/tomaskala.com

@@ -1,7 +1,7 @@
----
-title: A reasonably secure Linux laptop
-date: 2023/07/19
----
++++
+title = 'A Reasonably Secure Linux Laptop'
+date = 2023-07-19T16:15:12+02:00
++++
 
 Recently, my laptop died. To setup a new one, I wanted to play with the 
 security settings a bit, and learn some stuff along the way. I had used
@@ -53,8 +53,8 @@ all in all, it was a surprisingly smooth process.
   long recovery key instead of having TPM unlock the drive for me. What's 
   needed is to wipe the current key from the TPM slot, and enroll a new key. 
   This is done using the following command
-  ```
-  # systemd-cryptenroll /dev/sda1 --wipe-slot=tpm2 --tpm2-device=auto
+  ```bash
+  $ systemd-cryptenroll /dev/sda1 --wipe-slot=tpm2 --tpm2-device=auto
   ```
   (replace `/dev/sda1` by your LUKS partition).
 

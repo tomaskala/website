@@ -1,7 +1,7 @@
----
-title: Raspbian emulation in QEMU
-date: 2022/04/29
----
++++
+title = 'Raspbian Emulation in QEMU'
+date = 2022-04-29T21:44:01+02:00
++++
 
 Recently, I decided to reinstall my Raspberries, and while doing so, automate
 their configuration in Ansible. They were also long-overdue for an upgrade, as
@@ -30,8 +30,8 @@ machine, so that Ansible can be tested.
 # Preparation
 
 - Install QEMU.
-  ```
-  # pacman -S qemu-full qemu-emulators-full
+  ```bash
+  $ pacman -S qemu-full qemu-emulators-full
   ```
 - Download a QEMU kernel and a DTB file (containing the hardware description)
   from
@@ -58,51 +58,51 @@ both of them.
   partition.
 
 To mount both partitions, run the following.
-```
-# losetup --show --find --partscan 2022-04-04-raspios-bullseye-armhf-lite.img
+```bash
+$ losetup --show --find --partscan 2022-04-04-raspios-bullseye-armhf-lite.img
 /dev/loop1
-# ls /dev/loop1*
+$ ls /dev/loop1*
 /dev/loop1  /dev/loop1p1  /dev/loop1p2
-# mkdir /mnt/{raspbian-boot,raspbian-root}
-# mount /dev/loop1p1 /mnt/raspbian-boot
-# mount /dev/loop1p2 /mnt/raspbian-root
+$ mkdir /mnt/{raspbian-boot,raspbian-root}
+$ mount /dev/loop1p1 /mnt/raspbian-boot
+$ mount /dev/loop1p2 /mnt/raspbian-root
 ```
 
-Create a file `/mnt/raspbian-boot/userconf.txt` with the following structure.
-```
+Create a file `/mnt/raspbian-boot/userconf.txt` with the following structure:
+```ini
 <admin-username>:<password-hash>
 ```
 where the password hash can be obtained from
-```
+```bash
 $ echo '<password>' | openssl passwd -6 -stdin
 ```
 
 Next, comment out every line inside `/mnt/raspbian-root/etc/ld.so.preload`.
 
 Finally, unmount the image.
-```
-# umount /dev/loop1p1
-# umount /dev/loop1p2
-# rmdir /mnt/{raspbian-boot,raspbian-root}
-# losetup --detach /dev/loop1
+```bash
+$ umount /dev/loop1p1
+$ umount /dev/loop1p2
+$ rmdir /mnt/{raspbian-boot,raspbian-root}
+$ losetup --detach /dev/loop1
 ```
 
 # Convert the image
 
 For efficiency, the image is converted from the raw format to a `qcow2` format.
-```
+```bash
 $ qemu-img convert -f raw -O qcow2 2022-04-04-raspios-bullseye-armhf-lite.img raspbian-bullseye-lite.qcow2
 ```
 This allow us to quickly resize the image so that it will only grow in size
 when the guest OS requests so.
-```
+```bash
 $ qemu-img resize raspbian-bullseye-lite.qcow2 +6G
 ```
 
 # Run QEMU
 
 The virtual machine is started using the following command.
-```
+```bash
 $ qemu-system-arm \
     -no-reboot \
     -machine versatilepb -cpu arm1176 -m 256 \
@@ -113,7 +113,7 @@ $ qemu-system-arm \
     -nographic \
     -nic user,hostfwd=tcp::5022-:22
 ```
-The meaning of the parameters is as follows.
+The parameters stand for
 
 - `-no-reboot`: Exit on error instead of rebooting.
 - `-machine versatilepb -cpu arm1176 -m 256`: Set the emulated machine, its CPU
@@ -131,11 +131,11 @@ The meaning of the parameters is as follows.
 # SSH connection
 
 Enable the SSH server in the guest machine.
-```
-# systemctl enable --now ssh.service
+```bash
+$ systemctl enable --now ssh.service
 ```
 It is then possible to connect from the host to the guest over SSH.
-```
+```bash
 $ ssh <admin-username>@127.0.0.1 -p 5022
 ```
 
@@ -165,16 +165,16 @@ network, we can readily access any service it provides, without needing to
 setup any port forwarding.
 
 First, we have to create a bridge on the host and bring it up.
-```
-# ip link add name br0 type bridge
-# ip link set dev br0 up
+```bash
+$ ip link add name br0 type bridge
+$ ip link set dev br0 up
 ```
 
-Next, we have to assign an interface to the bridge we just created so that it
-knows where to forward received frames. For this, the interface needs to be up.
-Here I am assigning the `eth0` interface to the bridge.
-```
-# ip link set dev eth0 master br0
+Next, we have to assign an interface to the bridge we just created so that it 
+knows where to forward the received frames. For this, the interface needs to be 
+up. Here I am assigning the `eth0` interface to the bridge.
+```bash
+$ ip link set dev eth0 master br0
 ```
 
 Having set up the bridge, we now instruct QEMU to use it. Since QEMU 1.1, there
@@ -182,14 +182,14 @@ is a nifty `qemu-bridge-helper` utility that sets up the TAP device
 automagically. Because port forwarding is no longer needed, we can remove the
 `-nic user,hostfwd=tcp::5022-:22` flag. To make QEMU use the `br0` bridge, we
 launch it like this.
-```
+```bash
 $ qemu-system-arm \
     ... \
     -net nic -net bridge,br=br0
 ```
 
-To remove the bridge, we can run the following.
-```
-# ip link set dev eth0 nomaster
-# ip link delete dev br0
+To later remove the bridge, we can run the following.
+```bash
+$ ip link set dev eth0 nomaster
+$ ip link delete dev br0
 ```

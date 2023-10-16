@@ -1,7 +1,7 @@
----
-title: Arch Linux with LVM on LUKS
-date: 2023/02/27
----
++++
+title = 'Arch Linux With LVM on LUKS'
+date = 2023-02-27T22:02:27+02:00
++++
 
 I've been using Arch Linux for the past several years, but never quite got to 
 documenting the exact steps I use for installation. Every time I do a 
@@ -20,16 +20,16 @@ run [X](https://github.com/tomaskala/suckless) or
 
 First, download an image from <https://archlinux.org/download/> and copy it to a 
 USB drive, after having verified the file integrity.
-```
-# cat archlinux-YYYY.MM.DD-x86_64.iso >/dev/sdX && sync
+```bash
+$ cat archlinux-YYYY.MM.DD-x86_64.iso >/dev/sdX && sync
 ```
 
 # Network configuration
 
 If you are connected over Ethernet using DHCP, the network connection should 
 get picked up automatically. For Wi-Fi, authenticate using `iwctl`:
-```
-# iwctl
+```ini
+$ iwctl
 [iwd]# device list
 [iwd]# station <device-name> scan
 [iwd]# station <device-name> get-networks
@@ -39,13 +39,13 @@ get picked up automatically. For Wi-Fi, authenticate using `iwctl`:
 # Disk partitioning
 
 Check your drives with
-```
-# fdisk -l
+```bash
+$ fdisk -l
 ```
 The rest of the guide assumes that Arch is installed to `/dev/sda`. Run `fdisk` 
 on this device and start partitioning.
-```
-# fdisk /dev/sda
+```bash
+$ fdisk /dev/sda
 ```
 
 First, create a 600M EFI partition:
@@ -90,9 +90,9 @@ There are now three partitions:
 3. `/dev/sda3` for LVM on LUKS.
 
 To create the file systems for the first two, enter
-```
-# mkfs.fat -F32 /dev/sda1
-# mkfs.ext4 /dev/sda2
+```bash
+$ mkfs.fat -F32 /dev/sda1
+$ mkfs.ext4 /dev/sda2
 ```
 
 # LVM on LUKS
@@ -104,27 +104,27 @@ which would allow an encrypted volume to span more devices, with the volume
 group visible without decrypting the encrypted volumes.
 
 Setup encryption on the third partition. This will prompt you for a passphrase.
-```
-# cryptsetup luksFormat /dev/sda3
+```bash
+$ cryptsetup luksFormat /dev/sda3
 ```
 
 To be able to create the logical volumes and proceed with the installation, we 
 need to open the encrypted partition. This will prompt you for the passphrase 
 defined in the previous step.
-```
-# cryptsetup open /dev/sda3 root
+```bash
+$ cryptsetup open /dev/sda3 root
 ```
 Here, `root` is arbitrary and only describes where the unlocked partition 
 should be mapped. Once opened, it can be accessed in `/dev/mapper/root`.
 
 Initialize a physical volume for use by LVM:
-```
-# pvcreate --dataalignment 1m /dev/mapper/root
+```bash
+$ pvcreate --dataalignment 1m /dev/mapper/root
 ```
 
 Create a volume group in the physical volume we've just created:
-```
-# vgcreate vg0 /dev/mapper/root
+```bash
+$ vgcreate vg0 /dev/mapper/root
 ```
 The name of the group (`vg0` here) is arbitrary.
 
@@ -134,70 +134,70 @@ Finally, we can create the logical volumes.
 2. A 50G file system root partition.
 3. A home partition taking up all the remaining space.
 
-```
-# lvcreate -L 8G vg0 -n swap
-# lvcreate -L 50G vg0 -n root
-# lvcreate -l 100%FREE vg0 -n home
+```bash
+$ lvcreate -L 8G vg0 -n swap
+$ lvcreate -L 50G vg0 -n root
+$ lvcreate -l 100%FREE vg0 -n home
 ```
 
 Each partition needs a file system; I use `ext4`.
-```
-# mkswap /dev/mapper/vg0-swap
-# mkfs.ext4 /dev/mapper/vg0-root
-# mkfs.ext4 /dev/mapper/vg0-home
+```bash
+$ mkswap /dev/mapper/vg0-swap
+$ mkfs.ext4 /dev/mapper/vg0-root
+$ mkfs.ext4 /dev/mapper/vg0-home
 ```
 
 The partitions now have to be mounted, along with the `/boot` and EFI 
 partitions.
-```
-# mount /dev/mapper/vg0-root /mnt
+```bash
+$ mount /dev/mapper/vg0-root /mnt
 
-# mkdir /mnt/boot
-# mount /dev/sda2 /mnt/boot
+$ mkdir /mnt/boot
+$ mount /dev/sda2 /mnt/boot
 
-# mkdir /mnt/boot/efi
-# mount /dev/sda1 /mnt/boot/efi
+$ mkdir /mnt/boot/efi
+$ mount /dev/sda1 /mnt/boot/efi
 
-# mkdir /mnt/home
-# mount /dev/mapper/vg0-home /mnt/home
+$ mkdir /mnt/home
+$ mount /dev/mapper/vg0-home /mnt/home
 
-# swapon /dev/mapper/vg0-swap
-# mkdir /mnt/etc
+$ swapon /dev/mapper/vg0-swap
+$ mkdir /mnt/etc
 ```
 
 Generate the fstab file.
-```
-# genfstab -U /mnt >>/mnt/etc/fstab
+```bash
+$ genfstab -U /mnt >>/mnt/etc/fstab
 ```
 
 Make `/tmp` a RAM disk for increased speed and reduced SSD wear:
-```
-# echo 'tmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0' >>/mnt/etc/fstab
+```bash
+$ echo 'tmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0' >>/mnt/etc/fstab
 ```
 
 # Arch installation
 
 First, use `pacstrap` to install the `base` package, the Linux kernel and 
 firmware. When that's done, chroot into the newly installed system.
-```
-# pacstrap -i /mnt base base-devel linux linux-firmware
-# arch-chroot /mnt
+```bash
+$ pacstrap -i /mnt base base-devel linux linux-firmware
+$ arch-chroot /mnt
 ```
 
 At this point, we are working inside the newly installed system. Install some 
 additional packages. Based on your CPU manufacturer, select either `amd-ucode` 
 or `intel-ucode` in place of `<cpu-ucode>`.
-```
-# pacman -S <cpu-ucode> sudo vim iwd lvm2 grub efibootmgr
+```bash
+$ pacman -S <cpu-ucode> sudo vim iwd lvm2 grub efibootmgr
 ```
 
 Set a hostname of your choice:
-```
-# echo '<hostname>' >/etc/hostname
+```bash
+$ echo '<hostname>' >/etc/hostname
 ```
 
 Make sure the `/etc/hosts` file contains the following lines:
-```
+```ini
 127.0.0.1 localhost.localdomain localhost
 ::1 localhost.localdomain localhost
 127.0.0.1 <hostname>.localdomain <hostname>
@@ -205,43 +205,43 @@ Make sure the `/etc/hosts` file contains the following lines:
 
 Define your locale by uncommenting it inside `/etc/locale.gen` (in my case, 
 `en_US.UTF-8 UTF-8`) and running
-```
-# locale-gen
-# echo 'LANG=en_US.UTF-8' >/etc/locale.conf
+```bash
+$ locale-gen
+$ echo 'LANG=en_US.UTF-8' >/etc/locale.conf
 ```
 The changes will take effect after the next login.
 
 Setup system clock by running
-```
-# ln -s /usr/share/zoneinfo/<timezone> /etc/localtime
-# hwclock --systohc --utc
+```bash
+$ ln -s /usr/share/zoneinfo/<timezone> /etc/localtime
+$ hwclock --systohc --utc
 ```
 
 Finally, we have to enable encryption in `mkinitcpio` hooks. Make sure that the 
 line beginning with `HOOKS=` inside `/etc/mkinitcpio.conf` looks like this:
-```
+```ini
 HOOKS=(base udev autodetect keyboard keymap consolefont modconf block lvm2 encrypt filesystems fsck)
 ```
 and that the line beginning with `MODULES=` contains `ext4` in the parentheses. 
 After that, run
-```
-# mkinitcpio -p linux
+```bash
+$ mkinitcpio -p linux
 ```
 
 # User management
 
 Here we change the root password and create a user with superuser permissions.
-```
-# passwd
-# useradd -m -G wheel <username>
-# passwd <username>
+```bash
+$ passwd
+$ useradd -m -G wheel <username>
+$ passwd <username>
 ```
 Next, make members of the `wheel` group superusers.
-```
-# EDITOR=vim visudo
+```bash
+$ EDITOR=vim visudo
 ```
 and make sure that there is a line containing
-```
+```ini
 %wheel ALL=(ALL:ALL) ALL
 ```
 
@@ -249,36 +249,36 @@ and make sure that there is a line containing
 
 We'll refer to devices by UUIDs instead of bus names, because the device nodes 
 may be added in arbitrary order if you have more disk controllers. Run
-```
-# blkid
+```bash
+$ blkid
 ```
 and look up the UUID corresponding to `/dev/sda3`. Then, make sure that the 
 line starting with `GRUB_CMDLINE_LINUX=` inside `/etc/default/grub` looks like 
 this:
-```
+```ini
 GRUB_CMDLINE_LINUX="cryptdevice=UUID=<uuid>:vg0:allow-discards root=/dev/mapper/vg0-root"
 ```
 
 Install grub:
-```
-# grub-install --target=x86_64-efi --bootloader-id=grub_uefi --recheck
+```bash
+$ grub-install --target=x86_64-efi --bootloader-id=grub_uefi --recheck
 ```
 
 Setup grub locale and generate the grub configuration file:
-```
-# mkdir /boot/grub/locale
-# cp /usr/share/locale/en\@quot/LC_MESSAGES/grub.mo /boot/grub/locale/en.mo
-# grub-mkconfig -o /boot/grub/grub.cfg
+```bash
+$ mkdir /boot/grub/locale
+$ cp /usr/share/locale/en\@quot/LC_MESSAGES/grub.mo /boot/grub/locale/en.mo
+$ grub-mkconfig -o /boot/grub/grub.cfg
 ```
 
 # Finishing up
 
 Exit the system chroot, unmount all devices, reboot, and enjoy your new system.
-```
-# exit
-# umount -R /mnt
-# swapoff -a
-# reboot
+```bash
+$ exit
+$ umount -R /mnt
+$ swapoff -a
+$ reboot
 ```
 
 # Network configuration
@@ -289,7 +289,7 @@ summarize to keep the configuration handy.
 
 To configure wired networking, put the following inside 
 `/etc/systemd/network/cable.network`:
-```
+```ini
 [Match]
 Name=<name of the wired network device> <second one if applicable> [<more ...>]
 
@@ -301,13 +301,13 @@ IPv6PrivacyExtensions=true
 Anonymize=true
 ```
 Afterwards, run
-```
-# systemctl enable --now systemd-networkd.service
+```bash
+$ systemctl enable --now systemd-networkd.service
 ```
 
 To configure wireless networking, put the following inside 
 `/etc/iwd/main.conf`:
-```
+```ini
 [General]
 EnableNetworkConfiguration=true
 AddressRandomization=once
@@ -317,29 +317,29 @@ EnableIPv6=true
 ```
 Next, configure `iwd` to start only after `udev` has finished renaming the 
 network interfaces. Run
-```
-# systemctl edit iwd.service
+```bash
+$ systemctl edit iwd.service
 ```
 and enter
-```
+```systemd
 [Unit]
 Requires=sys-subsystem-net-devices-<wireless-device>.device
 After=sys-subsystem-net-devices-<wireless-device>.device
 ```
 Afterwards, run
-```
-# systemctl enable --now iwd.service
+```bash
+$ systemctl enable --now iwd.service
 ```
 
 To disable `iwd` when WiFi is not present, put the following inside 
 /etc/udev/rules.d/wifi.rules`:
-```
+```ini
 SUBSYSTEM=="rfkill", ENV{RFKILL_NAME}=="phy0", ENV{RFKILL_TYPE}=="wlan", ACTION=="change", ENV{RFKILL_STATE}=="1", RUN+="/usr/bin/systemctl --no-block start iwd.service"
 SUBSYSTEM=="rfkill", ENV{RFKILL_NAME}=="phy0", ENV{RFKILL_TYPE}=="wlan", ACTION=="change", ENV{RFKILL_STATE}=="0", RUN+="/usr/bin/systemctl --no-block stop iwd.service"
 ```
 
 Finally, to setup `systemd-resolved` as the DNS client, run
-```
-# systemctl enable --now systemd-resolved.service
-# ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+```bash
+$ systemctl enable --now systemd-resolved.service
+$ ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
 ```

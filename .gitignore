@@ -1,7 +1,3 @@
-# Exclude generated HTML files.
-posts/*.html
-index.html
-about.html
-
-# Exclude the generated index.
-index.md
+.hugo_build.lock
+public/
+resources/

@@ -1,7 +1,7 @@
----
-title: Server structure
-date: 2022/02/27
----
++++
+title = 'My Server Structure'
+date = 2022-02-27T20:18:20+01:00
++++
 
 In this post, I want to document my server structure. Mostly for myself to have
 a reference to come back to, but perhaps someone will find something useful
@@ -86,10 +86,9 @@ set it to never respond with private IP address ranges, to verify DNSSEC
 signatures, to send the minimum amount of information to upstream DNS servers,
 etc.
 
-I considered setting up DNS over TLS and to pass the queries to another DNS
-provider, such as [Quad9](https://www.quad9.net/) or
-[Cloudflare](https://www.cloudflare.com/), but so far, I simply recursively
-query the root nameservers. Maybe I'll revisit this in the future.
+I considered setting up DNS over TLS and to pass the queries to another DNS 
+provider, such as Quad9 or Cloudflare, but so far, I simply recursively query 
+the root nameservers. Maybe I'll revisit this in the future.
 
 > Update 2022/06/15: I now forward the DNS queries to Quad9 through DNS over
 > TLS. It's trivial to configure ([assuming one takes care to validate the
@@ -113,7 +112,7 @@ through the WireGuard interface, but this does not solve the first one.
 
 It's trivial to configure WireGuard to use a specific DNS server by adding the
 following lines to its configuration:
-```
+```ini
 DNS = <server-ip-address-inside-the-vpn>
 PostUp = resolvectl dns %i <server-ip-address-inside-the-vpn>; resolvectl domain %i "~."; resolvectl default-route %i true
 PreDown = resolvectl revert %i
@@ -137,7 +136,7 @@ The result is a small
 [script](https://github.com/tomaskala/infra/blob/6bf2b6d4914edd2d4bbd2e04604ea90f2c20519e/roles/unbound_blocking/files/dns-blocklist/fetch-blocklist.py)
 that queries a bunch of blocklists in the `/etc/hosts` file format, converts
 each domain into
-```
+```ini
 "<domain>." always_null
 ```
 and feeds those to Unbound through the `unbound-control` program. The whole 

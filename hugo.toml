@@ -1,0 +1,46 @@
+baseURL = 'https://tomaskala.com/'
+title = 'Tomas Kala'
+languageCode = 'en-us'
+theme = 'hello-friend-ng'
+
+copyright = 'Tomas Kala'
+enableRobotsTXT = true
+paginate = 10
+rssLimit = 10
+
+[params]
+description = 'My personal website'
+enableThemeToggle = true
+homeSubtitle = 'Software engineer'
+
+[params.logo]
+logoMark = '$'
+logoText = ':(){ :|:& };:'
+
+[[params.social]]
+name = 'email'
+url = 'mailto:contact@tomaskala.com'
+
+[[params.social]]
+name = 'github'
+url = 'https://github.com/tomaskala/'
+
+[[params.social]]
+name = 'linkedin'
+url = 'https://www.linkedin.com/in/tomas-kala-96506b296'
+
+[params.footer]
+trademark = 2023
+rss = true
+copyright = true
+
+[menu]
+[[menu.main]]
+identifier = 'posts'
+name = 'Posts'
+url = '/posts/'
+
+[[menu.main]]
+identifier = 'about'
+name = 'About'
+url = '/pages/about/'
