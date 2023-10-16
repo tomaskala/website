@@ -4,7 +4,7 @@ date = 2022-06-16T20:10:32+02:00
 +++
 
 The next step in my nerdy networking hobby was to expand my [server
-configuration](/posts/my-server-structure/) to
+configuration]({{< ref "/posts/my-server-structure" >}}) to
 allow remote access to my home network. Naturally, this involved setting up a
 VPN and some way to access it from outside the network, among other things.
 

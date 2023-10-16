@@ -17,7 +17,7 @@ no way of telling whether anyone actually reads this, and I don't care.
 The entire system of building this site is also as simple as I could make it.
 
 I write my posts in markdown. They are converted to HTML using 
-[pandoc](https://pandoc.org/). The [index](/) is generated using a simple 
+[pandoc](https://pandoc.org/). The index is generated using a simple 
 [shell 
 script](https://github.com/tomaskala/website/blob/8399f06389fe54cebd9b84871a79acd85c8b4fc2/fill-index), 
 before being converted to HTML as well. Finally, the entire website is rsync'd 

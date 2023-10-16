@@ -17,12 +17,12 @@ services](https://serverfault.com/questions/1015970/is-rpcbind-needed-for-an-nfs
 Synology configuration allows one to configure the _maximum_ NFS protocol 
 version, as seen in the image below.
 
-![Synology NFS configuration](nfs_configuration.jpg)
+{{< figure src="nfs_configuration.jpg" title="Synology NFS configuration" >}}
 
 There seems to be no way to disable the older version though? No luck in the 
 "Advanced" section either.
 
-![Synology advanced NFS configuration](nfs_advanced_configuration.jpg)
+{{< figure src="nfs_advanced_configuration.jpg" title="Synology advanced NFS configuration" >}}
 
 Let's try the manual way. SSH into the NAS and look for an NFS configuration 
 file under `/etc/`.
