@@ -5,8 +5,10 @@ theme = 'hello-friend-ng'
 
 copyright = 'Tomas Kala'
 enableRobotsTXT = true
-paginate = 10
 rssLimit = 10
+
+[pagination]
+pagerSize = 10
 
 [params]
 description = 'My personal website'
