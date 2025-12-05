@@ -19,11 +19,10 @@ networks. It follows the standard OSI model from the bottom up, much like
 the material is taught in schools.
 
 I felt like the higher in the model the book went, the less specific the 
-authors were, as if they were experts on the bottom layers but not as much on 
+authors were, as if they were experts on the lower layers but not so much on 
 the upper ones. This is partly due to the multitude of protocols available in 
 the application layer. The book has to balance between diving deep into
-a few key protocols, or doing a quick pass over many, without going into 
-details.
+a few key protocols, or doing a quick pass over many.
 
 One thing I did not like is that the authors often got sidetracked by
 describing obsolete protocols from the 70's. Likewise, tedious explanations of 
@@ -52,9 +51,9 @@ learned in the Peterson & Davie book though.
 
 I find all the mathematics behind computers amazingly cool. I have studied it a 
 lot, both at the university and by myself, and I even look for science fiction 
-books with computability concepts. The computability and complexity 
-theory, formal languages, logic and graph theory fields are to this day my 
-favorite mathematical domains.
+books with computability concepts. Computability and complexity theory, formal 
+languages, logic and graph theory are to this day my favorite mathematical 
+domains.
 
 ## Charles Petzold - Code: The Hidden Language of Computer Hardware and Software
 
@@ -62,7 +61,7 @@ This is what I wish my hardware courses were. A pretty short book that takes
 us on a journey from propositional logic and logical circuits over the inner 
 workings of the CPU and memory all the way to how an entire computer works. 
 
-One thing in particular that I remember is that I've always wondered where the 
+One thing I remember in particular is that I've always wondered where the 
 translation from the assembly (or, equivalently, the machine code) to some sort 
 of an electrical signal occurs. This books explains that there is no such 
 translation, and that the machine code is exactly equal to the signal.
@@ -87,7 +86,7 @@ this statement is universally valid?"
 I got interested in programming language internals around the time I started 
 learning Haskell, as is typical. I wrote a few toy Lisp interpreters and even 
 production-ready network protocol parsers, but I never got around to 
-implementing a full programming language.
+implementing a full programming language before reading the following book.
 
 ## Robert Nystrom - Crafting Interpreters
 
