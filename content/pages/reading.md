@@ -109,3 +109,22 @@ Lox itself, as well as the second interpreter, are heavily inspired by Lua,
 probably my all-time favorite language. The second interpreter also shows how 
 to implement several data structures typically used in an interpreter, simply 
 because C doesn't provide them.
+
+# Software engineering
+
+Finally, there are some books related to the general software engineering 
+practices.
+
+## Martin Kleppmann - Designing Data-Intensive Applications
+
+This book helped me not feel so lost in modern scalable applications. I 
+particularly like the viewpoint that most systems - caches, storage, message 
+brokers - can be viewed as databases, just each with different requirements and 
+trade-offs.
+
+It's impossible to go in depth, given how many different systems there are, but 
+the book does a pretty good job of describing the principles. I learned about 
+what components a scalable application consists of, how they interact, what can 
+go wrong, and when (not) to use them. By understanding the building blocks and 
+having the vocabulary, I can quickly get familiar with new applications and 
+know what to look for when diagnosing issues.
