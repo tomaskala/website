@@ -1,6 +1,6 @@
 baseURL = 'https://tomaskala.com/'
 title = 'Tomas Kala'
-languageCode = 'en-us'
+locale = 'en-us'
 theme = 'hello-friend-ng'
 
 copyright = 'Tomas Kala'
