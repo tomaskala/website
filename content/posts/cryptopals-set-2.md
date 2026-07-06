@@ -41,6 +41,104 @@ We could make the oracle also return which mode was used to be able to unit test
 
 # [Challenge 12](https://cryptopals.com/sets/2/challenges/12)
 
+We implement an oracle that accepts a plaintext, appends an unknown string to it, encrypt the result under the ECB mode, and returns the resulting ciphertext. It turns out that without knowing the encryption key, we can recover the unknown string by repeated calls to the oracle with suitably crafted input. It works like this:
+
+1. Determine the cipher's block size.
+
+    We know that the oracle is using AES whose block size is 16 bytes, but this makes the solution more general. We try a range of values (I went for 2-64), create a buffer twice as large filled with the letter 'A', and append 'B' to it. We then feed this buffer to the oracle, and use our ECB detection code from Challenge 08. The reason we append 'B' to the buffer of A's is to cover for the case where the unknown suffix happened to start with 'A', messing up our count by one.
+
+2. Build a mapping between encrypted blocks and plaintext bytes.
+
+    Knowing the block size, we can now create a bytestring filled with 'A' that's exactly one letter shorter than the block size. If we feed it to the oracle, it will append the unknown suffix making the first byte appear in the last position of the block. It will then return the corresponding ciphertext. It turns out that we can determine this first byte by a simple dictionary lookup.
+
+    The dictionary will look like this:
+    ```
+    ciphertext(AAAAAAAAAAAAAAAA) -> A
+    ciphertext(AAAAAAAAAAAAAAAB) -> B
+    ciphertext(AAAAAAAAAAAAAAAC) -> C
+    ...
+    ```
+    repeating for all 256 possible bytes.
+
+    When we later call the oracle with an input 1 byte shorter, we can isolate the first block and lookup the ciphertext in this dictionary, obtaining the first letter of the unknown suffix.
+
+3. Recover the unknown suffix one byte at a time.
+
+    Rather than attempt to explain this, it might be helpful to see what happens in four interesting scenarios. To make it shorter, we will assume block size of 8 bytes. The unknown suffix is `UNKNOWNSUFFIX`, with padding shown as `P`.
+
+    1. Decrypting the first byte
+    ```
+    learning the mapping:
+    AAAAAAA?
+    UNKNOWNS
+    UFFIXPPP
+
+    query to the oracle: AAAAAAA
+    complete plaintext:  AAAAAAAU NKNOWNSU FFIXPPPP
+                         ^^^^^^^^
+                         ciphertext of this is the key to the learned mapping
+    ```
+
+    2. Decrypting the second byte
+    ```
+    learning the mapping:
+    AAAAAAU?
+    NKNOWNSU
+    FFIXPPPP
+
+    query to the oracle: AAAAAA
+    complete plaintext:  AAAAAAUN KNOWNSUF FIXPPPPP
+                         ^^^^^^^^
+                         ciphertext of this is the key to the learned mapping
+    ```
+
+    3. Decrypting the eight byte (the last in the first block)
+    ```
+    learning the mapping:
+    UNKNOWN?
+    SUFFIXPP
+
+    query to the oracle: <empty>
+    complete plaintext:  UNKNOWNS UFFIXPPP
+                         ^^^^^^^^
+                         ciphertext of this is the key to the learned mapping
+    ```
+
+    4. Decrypting the ninth byte (the first in the second block)
+    ```
+    learning the mapping:
+    NKNOWNS?
+    UFFIXPPP
+
+    query to the oracle: AAAAAAA
+    complete plaintext:  AAAAAAAU NKNOWNSU FFIXPPPP
+                                  ^^^^^^^^
+                                  ciphertext of this is the key to the learned mapping
+                         ^^^^^^^^ drop this, we have already processed the first block
+    ```
+
+    We see that the padding with A's becomes irrelevant when learning the mapping between the encrypted blocks and the plaintext bytes. It's only necessary at the beginning when we do not yet have a full block's worth of decrypted plaintext. We can build the dictionary key as
+    ```
+    key = oracle(bytestring[length(bytestring)-block-size:length(bytestring)])[0:block-size]
+
+    where bytestring = (<padding> || <decrypted part of the suffix> || b)
+          padding is a string of A's block-size long
+          b iterates between 0 and 255 (inclusive)
+    ```
+
+    Finally, we need to come up with a formula to determine how many A's to include in the query to the oracle. After a bit of thinking, I came up with
+    ```
+    block-size - length(decrypted-bytes) - 1 mod block-size
+    ```
+    This works with the four scenarios above:
+    1. `8 - 0 - 1 mod 8 = 7 mod 8 = 7`
+    2. `8 - 1 - 1 mod 8 = 6 mod 8 = 6`
+    3. `8 - 7 - 1 mod 8 = 0 mod 8 = 0`
+    4. `8 - 8 - 1 mod 8 = -1 mod 8 = 7`
+    The interpretation is that we need to start with `block-size` A's when we haven't yet decrypted anything, subtract the number of decrypted bytes (because we keep needing fewer A's as we decrypt), subtract 1 (because we need to iterate the last byte), and take the modulo by `block-size` (because we never need more than one full block.
+
+The neat thing here is that because we can query for one byte at a time and all the bytes are independent of each other, the complexity of the attack is linear with respect to the suffix length, not exponential. For each suffix byte, we only need to iterate over 256 possible bytes.
+
 # [Challenge 13](https://cryptopals.com/sets/2/challenges/13)
 
 # [Challenge 14](https://cryptopals.com/sets/2/challenges/14)
