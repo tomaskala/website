@@ -143,6 +143,41 @@ The neat thing here is that because we can query for one byte at a time and all 
 
 # [Challenge 14](https://cryptopals.com/sets/2/challenges/14)
 
+This challenge is a more difficult variation of Challenge 12. This time, the oracle also prepends a random prefix to the input string before encrypting. Before, the oracle did
+```
+suffix-oracle(input-string) = AES-ECB(input-string || target-suffix, unknown-key)
+```
+This time, it does
+```
+prefix-suffix-oracle(input-string) = AES-ECB(random-prefix || input-string || target-suffix, unknown-key)
+```
+
+We know neither the random prefix nor its length. Same as in Challenge 12, we want to retrieve `target-suffix` by repeatedly querying the oracle with a suitably crafted `input-string`. Our goal here is to reduce the challenge to Challenge 12, so that we can reuse our attack.
+
+This would be really easy if we happened to know the length of `random-prefix` and it was a multiple of the block size. We could simply call our attack from Challenge 12 with an oracle function that would look like this:
+```
+oracle(input-string) = prefix-suffix-oracle(input-string)[prefix-length:]
+```
+The prefix length being a multiple of the block size is important, and slicing it away otherwise wouldn't work. That's because the bytes exceeding the block size would get encrypted into the same block as the first part of the input string, completely scrambling it, and passing the "AAAAA..." input would no longer work correctly.
+
+Let's now generalize slightly. We will still assume the length is known, but now it's no longer a multiple of the block size. We need to pass enough padding to `prefix-suffix-oracle` from Challenge 12 to reach a block boundary. We will do
+```
+oracle(input-string) = prefix-suffix-oracle(padding || input-string)[prefix-length + padding-length:]
+```
+where `padding` is an arbitrary bytestring of `padding-length` bytes, and `padding-length` is `block-size - prefix-length mod block-size`. That is, we need as much padding as there is missing from the prefix length to reach the block size.
+
+All that remains is to find the prefix length. We do this by passing two equal blocks to the oracle, taking again advantage of the fact that ECB encrypts the same plaintext to the same ciphertext. We will then iterate over the ciphertext and detect the position where a block equal to the following block begins. This by itself would again work only if the prefix length was a multiple of the block size, so we will prepend with a padding whose length iterates between 0 and 15 (the AES block size - 1, inclusive). Schematically:
+```
+prefix-suffix-oracle(padding || AAAAAAAAAAAAAAAA AAAAAAAAAAAAAAAA || S)
+where padding is a string of P's padding-length long
+      padding-length iterates between 0 and 15 (inclusive)
+```
+We append an S after the repeated blocks ("separator") just in case the target string begins with the letter A. The prefix length is then `start - padding-length`, where `start` is the index in the ciphertext where the first `AAAAAAAAAAAAAAAA` block begins.
+
+This works under two assumptions:
+1. We already know that the block size is 16 (the AES block size). We could instead try a few common values here.
+2. The random prefix contains no subsequent repeated blocks. If it did, we could instead detect the repetition starting from the end of the ciphertext. If even the unknown suffix repeated blocks, we would just collect all repetition starts and try them one by one.
+
 # [Challenge 15](https://cryptopals.com/sets/2/challenges/15)
 
 # [Challenge 16](https://cryptopals.com/sets/2/challenges/16)
