@@ -232,4 +232,6 @@ This works under two assumptions:
 
 # [Challenge 15](https://cryptopals.com/sets/2/challenges/15)
 
+This challenge simply has us implement a PKCS#7 unpad function, which I already implemented in Challenge 09. The function must signal when the padding is invalid; this is something we will use later in Set 3 to implement a CBC padding oracle attack.
+
 # [Challenge 16](https://cryptopals.com/sets/2/challenges/16)
