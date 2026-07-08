@@ -141,6 +141,58 @@ The neat thing here is that because we can query for one byte at a time and all 
 
 # [Challenge 13](https://cryptopals.com/sets/2/challenges/13)
 
+We are given an API that, given an email address, returns an encrypted URL-encoded cookie that authenticates a user with that email as a regular user. The API itself is well-written and properly escapes all special characters, so we can't just inject arbitrary input to it. Still, because the cookie is encrypted under the ECB mode, we can edit it to instead authenticate as the admin. That is, change
+```
+AES-ECB(email=foo@bar.com&uid=10&role=user)
+```
+into
+```
+AES-ECB(email=foo@bar.com&uid=10&role=admin)
+```
+without ever decrypting it.
+
+I decided to implement the URL encoding properly using Go's [net/url.Values](https://pkg.go.dev/net/url@go1.26.5#Values) type. This is the correct thing to do, but it complicated the task, because its ordering is non-deterministic (the `Value` type is an alias for `map[string][]string`). I decided to cover two cases - one where the encoding follows the ordering given in the task (`email=foo@bar.com&uid=10&role=user`) and another that I observed (`email=foo@bar.com&role=user&uid=10`). The email was always in the first position, though it wouldn't be difficult to cover more cases.
+
+The attack again takes advantage of the ECB mode encrypting the same blocks to the same ciphertext. This time, we will craft a suitable email input and cut the resulting ciphertext into blocks. We will then rearrange them and obtain a ciphertext representing an admin cookie. I didn't bother with the email input being a valid email address, but it would be trivial to change this.
+
+1. Ordering `email=foo@bar.com&uid=10&role=user`
+
+We need to create one block that begins with `admin` and another block that ends with `role=`. We will then use them to assemble an admin cookie. The `admin` and `role=` strings must be at the block boundaries, because we cannot just slice into the middle of a block - that would completely scramble the contents.
+
+The following two email queries lead to the cookies displayed below them (divided into blocks for readability):
+```
+email = AAAAAAAAAAadmin
+                 block1           block2           block3
+cookie = AES-ECB(email=AAAAAAAAAA admin&uid=10&rol e=userPPPPPPPPPP)
+
+email = AAAAAAAAAAAAA
+                 block4           block5           block6
+cookie = AES-ECB(email=AAAAAAAAAA AAA&uid=10&role= userPPPPPPPPPPPP)
+```
+We will assemble the admin cookie by combining blocks 1, 5, 2 and 3:
+```
+admin-cookie = block1 || block5 || block2 || block3
+             = email=AAAAAAAAAA AAA&uid=10&role= admin&uid=10&rol e=userPPPPPPPPPP
+```
+
+2. Ordering `email=foo@bar.com&role=user&uid=10`
+
+The idea is similar, but we need a slightly different input because of the different ordering:
+```
+email = AAAAAAAAAAadmin
+                 block1           block2           block3
+cookie = AES-ECB(email=AAAAAAAAAA admin&uid=10&rol e=userPPPPPPPPPP)
+
+email = AAAA
+                 block4           block5
+cookie = AES-ECB(email=AAAA&role= user&uid=10PPPPP)
+```
+The admin cookie is this:
+```
+admin-cookie = block4 || block2 || block3
+             = email=AAAA&role= admin&uid=10&rol e=userPPPPPPPPPP
+```
+
 # [Challenge 14](https://cryptopals.com/sets/2/challenges/14)
 
 This challenge is a more difficult variation of Challenge 12. This time, the oracle also prepends a random prefix to the input string before encrypting. Before, the oracle did
