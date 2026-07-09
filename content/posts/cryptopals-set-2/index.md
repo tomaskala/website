@@ -235,3 +235,30 @@ This works under two assumptions:
 This challenge simply has us implement a PKCS#7 unpad function, which I already implemented in Challenge 09. The function must signal when the padding is invalid; this is something we will use later in Set 3 to implement a CBC padding oracle attack.
 
 # [Challenge 16](https://cryptopals.com/sets/2/challenges/16)
+
+The last challenge of this set is a variation on Challenge 13. The cookie now consists of a fixed prefix, our input, and a fixed suffix. This time, it is encrypted under the CBC mode. The input is again sanitized, and our task is again to become an admin by editing the ciphertext. That is, given
+```
+ciphertext(input) = AES-CBC(prefix || sanitize(input) || suffix)
+```
+edit `ciphertext(input)` so that it contains `;admin=true;`.
+
+Borrowing a CBC decryption diagram from Wikipedia, we see that each block of ciphertext is XORed with the next decrypted block to form the plaintext block: ![CBC-decryption](CBC_decryption.svg). If we edit a position in the ciphertext block, it will completely scramble the corresponding plaintext block, but the same edit will propagate to the following plaintext block. We can use that.
+
+The authors of the challenge were kind enough to prepend a prefix that's 32 bytes long, so our input starts at a block boundary. We will obtain a cookie like this:
+```
+input = "AadminAtrueAAAAA"
+cookie = ciphertext(input)
+```
+Our goal is to convert the first three A's into `;`, `=` and `;`, respectively.
+
+From the CBC decryption diagram, we know that we need to edit the preceding ciphertext block and that it will be XORed with the following decrypted block. We can craft a new ciphertext like this:
+```
+edited-block     = ciphertext[16:32]
+edited-block[0]  = edited-block[0]  XOR input[0]  XOR ';'
+edited-block[6]  = edited-block[6]  XOR input[6]  XOR '='
+edited-block[11] = edited-block[11] XOR input[11] XOR ';'
+
+new-ciphertext = ciphertext[0:16] + edited-block + ciphertext[32:length(new-ciphertext)]
+```
+
+When decrypting, the `input[0]`, `input[6]` and `input[11]` will be XORed to the same values in the decrypted block and cancel themselves out, leaving us with the bytes for `;`, `=` and `;`. The plaintext block whose ciphertext we edited will be completely unreadable, but the following block will become `;admin=true;AAAA`.
