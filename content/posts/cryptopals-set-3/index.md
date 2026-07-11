@@ -67,6 +67,15 @@ Once we are finished, we continue with the next block, substituting the previous
 
 # [Challenge 18](https://cryptopals.com/sets/3/challenges/18)
 
+This task is a preparation for the following two. We implement the CTR mode, which transforms a block cipher into a stream cipher. Perhaps unintuitively, it doesn't actually encrypt the plaintext. Instead, it encrypts an incrementing state, forming blocks of a key stream. This key stream is then XORed with the plaintext, forming the ciphertext (reminiscent of the [one-time pad](https://en.wikipedia.org/wiki/One-time_pad)). The advantage is that we don't need to bother with any padding - when the plaintext ends, we just stop XORing it with the key stream.
+
+The question is how to form the state. If we simply started at 0 and incremented for each byte (or a block), then two plaintexts would get XORed with exactly the same key stream. This is very bad, as the next two challenges will show. Instead, the state consists of two parts concatenated together:
+
+1. The nonce ("number used only once"), which must be unique for each message we encrypt; otherwise, they would be XORed with the same key stream.
+2. The counter, which increments for each block.
+
+The other nice thing is that we don't need to write a separate decryption function. Because XOR is symmetric, we can just encrypt the ciphertext with the same key stream to get back the plaintext.
+
 # [Challenge 19](https://cryptopals.com/sets/3/challenges/19)
 
 # [Challenge 20](https://cryptopals.com/sets/3/challenges/20)
