@@ -78,7 +78,23 @@ The other nice thing is that we don't need to write a separate decryption functi
 
 # [Challenge 19](https://cryptopals.com/sets/3/challenges/19)
 
+Challenge 19 has us do manually what Challenge 20 has us then automate, so I'm just going to skip right to that.
+
 # [Challenge 20](https://cryptopals.com/sets/3/challenges/20)
+
+We are given a list of ciphertext that have been each encrypted in the CTR mode. Unfortunately, all encryptions shared the same key and nonce, effectively using the same exact key stream for each. Reusing the encryption key isn't a problem, but as its name suggests, the nonce must never be reused for different messages. We will see how that allows us to recover the plaintexts.
+
+We are given something like this:
+```
+ciphertext1 = plaintext1 XOR keystream
+ciphertext2 = plaintext2 XOR keystream
+ciphertext3 = plaintext3 XOR keystream
+ciphertext4 = plaintext4 XOR keystream
+```
+
+Because the key stream is always the same, all the bytes in the i-th column have been XORed with the same key byte. Does that remind you of anything? That's almost exactly how we broke the Vigenère cipher in the [first set](/posts/cryptopals-set-1). The key doesn't repeat here, but otherwise, we can again recover it byte by byte by considering the successive column. The only problem is that the further we go, the less data we have: the shorter strings will end, leaving us with only a handful of longer strings to work with. As such, we will typically miss the last few bytes. We can still recover the beginning almost perfectly though.
+
+The lesson here is that if you reuse a nonce for encrypting multiple messages in the CTR mode, your encryption can be trivially broken. Never reuse the nonce.
 
 # [Challenge 21](https://cryptopals.com/sets/3/challenges/21)
 
