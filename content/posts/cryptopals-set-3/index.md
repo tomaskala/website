@@ -98,6 +98,8 @@ The lesson here is that if you reuse a nonce for encrypting multiple messages in
 
 # [Challenge 21](https://cryptopals.com/sets/3/challenges/21)
 
+In this challenge, we implement the famous Mersenne Twister random number generator. Rather than trying to explain how it works, I'll just link the home page with the reference implementation and test vector: <https://www.math.sci.hiroshima-u.ac.jp/m-mat/MT/emt.html>. We will use it in the following challenges to show how an unsafe random number generation can break your cryptography.
+
 # [Challenge 22](https://cryptopals.com/sets/3/challenges/22)
 
 # [Challenge 23](https://cryptopals.com/sets/3/challenges/23)
