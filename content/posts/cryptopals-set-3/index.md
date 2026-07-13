@@ -102,6 +102,19 @@ In this challenge, we implement the famous Mersenne Twister random number genera
 
 # [Challenge 22](https://cryptopals.com/sets/3/challenges/22)
 
+We use the current timestamp as the seed to our pseudorandom number generator and show that it can be easily recovered from an observed random value. This attack works against any random number generator, not just the Mersenne Twister. Even using a cryptographically-secure random number generator wouldn't help - the seed simply doesn't have enough entropy. The attacker can simply bruteforce through the (relatively few) possible seeds, run the generator, and compare the generated values. Once they have the seed, they can generate exactly the same random values as us. If we use them to for example create an AES encryption key, we obviously have a problem.
+
+To calculate the entropy, suppose the following:
+
+1. We seed the generator with the current timestamp at the `T1`.
+2. The attacker observes the generated value at time `T2`; `T2 > T1`.
+
+Assume we use the usual Unix timestamp that measures the number of non-leap seconds elapsed since 00:00:00 UTC, January 1 1970. The attacker then needs to iterate over all seconds in the interval `[T1, T2]`, instantiate a new MT19937 generator seeded with the current second, and compare its output with the captured random value. That's `T2 - T1 + 1` values in total, whose entropy is `log2(T2 - T1 + 1)` bits. Even if they wait 24 hours before capturing the random output, that's a laughable `log2(86400) ~ 16.4` bits of entropy.
+
+This only works if the attacker knows we are using the MT19937 generator. In practice, they can either guess this based on the language our service is written in (check the standard library and see what generator is used), or try several common generators at once.
+
+I didn't want the tests to take a long time, so instead of sleeping several seconds and using the Unix timestamp as the seed like the task suggested, I converted everything to milliseconds.
+
 # [Challenge 23](https://cryptopals.com/sets/3/challenges/23)
 
 # [Challenge 24](https://cryptopals.com/sets/3/challenges/24)
