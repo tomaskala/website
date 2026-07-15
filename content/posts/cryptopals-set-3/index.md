@@ -117,4 +117,126 @@ I didn't want the tests to take a long time, so instead of sleeping several seco
 
 # [Challenge 23](https://cryptopals.com/sets/3/challenges/23)
 
+In this challenge, we see what does it mean that a random number generator isn't cryptographically secure.
+
+## Background
+
+The length of Mersenne Twister state array is 624 32-bit numbers. After initialization, it works by repeating these two phases:
+
+1. Generate 624 pseudorandom numbers by iterating through the state array, applying a tempering operation on each element, and returning the result.
+2. Apply a twisting operation on the state array, completely recalculating it.
+
+By observing the full run of 624 generated numbers (before a twist is applied), we can recover the state array. At this point we can clone the generator and keep producing exactly the same output as the original one. If the Mersenne Twister generator is used to generate encryption keys or any other cryptographic material, the attacker can simply capture enough output, clone the generator, and then generate the same keys.
+
+It's improbable that the attacker starts collecting the random data right after the twisting operation has been applied. Instead, they will likely start somewhere inside the twisting period. As long as they capture 2 x 624 generated numbers, they are guaranteed to observe one full run though. They can simply recover the state array, make their generator generate a number, and compare it to the next captured number. By iterating this process, they will eventually match the output, confirming that the recovered state array is correct.
+
+## Attack
+
+The tempering operation works like this:
+
+```
+y0 := state[index]
+index := index + 1
+
+y1 := y0 XOR (y0 >> 11)
+y2 := y1 XOR ((y1 << 7) AND 0x9d2c5680)
+y3 := y2 XOR ((y2 << 15) AND 0xefc60000)
+y4 := y3 XOR (y3 >> 18)
+
+return y4
+```
+
+We see that it consists of two kinds of operations:
+
+1. XOR a value with itself, shifted to the right.
+2. XOR a value with itself, shifted to the left and ANDed with a constant.
+
+Both these operations are reversible. Once we find the reverse, we can apply them to `y4` in reverse order to recover `y0`.
+
+### Inverting the right shift
+
+Let's start with reverting the right shift: `y1 := y0 XOR (y0 >> s)`. At first, it looks like we are losing some information - by shifting a value to the right by `s`, we throw away the `s` most-significant bits. If that was all we were doing, then yes, we would be throwing something away. However, what we are doing on top is XOR this with the original value. Consider this example:
+
+```
+      s                = 11 (decimal)
+      y0               = 10010110 11011001 00110101 00011101 (binary)
+      y0 >> s          = 00000000 00010010 11011011 00100110 (binary)
+y1 := y0 XOR (y0 >> s) = 10010110 11001011 11101110 00111011 (binary)
+                         ^^^^^^^^ ^^^
+                         The s most-significant bits are the same as in y
+```
+
+We are given `y1` and `s`, and have to recover `y0`. We see that by being XORed to `s = 11` zeros, the first `s = 11` bits of `y1` are the same as of `y0`. The following `s = 11` bits of `y0` were XORed with the first `s = 11` bits of `y0` (because of the shift), so by XORing them again with them, we recover the next `s = 11` bits of `y0`. We keep going in this way until the entire `y0` has been recovered. Continuing the example (denoting the recovered bits by `^`):
+
+```
+x0 := y1                = 10010110 11001011 11101110 00111011
+                          ^^^^^^^^ ^^^
+x0 >> s                 = 00000000 00010010 11011001 01111101
+x1 := y1 XOR (x0 >> s)  = 10010110 11011001 00110111 01000110
+                          ^^^^^^^^ ^^^^^^^^ ^^^^^^
+x1 >> s                 = 00000000 00010010 11011011 00100110
+x2 := y1 XOR (x1 >> s)  = 10010110 11011001 00110101 00011101
+                          ^^^^^^^^ ^^^^^^^^ ^^^^^^^^ ^^^^^^^^
+```
+
+The algorithm can be expressed as follows:
+
+```
+revert-right-shift(y1, s):
+  x = y1
+  for i = 0, ..., 32 / s + 1:
+    x = y XOR (x >> s)
+  return x
+```
+
+### Inverting the left shift
+
+Next, let's look at how to invert the left shift: `y1 := y0 XOR ((y0 << s) AND c)`. This looks scary because the XORed value is further scrambled by ANDing it with a constant, but the approach is almost the same. Let's again look at an example with the same `y0`:
+
+```
+      s                      = 7
+      c = 0x9d2c5680         = 10011101 00101100 01010110 10000000
+      y0                     = 10010110 11011001 00110101 00011101
+      y0 << s                = 01101100 10011010 10001110 10000000
+      (y0 << s) AND c        = 00001100 00001000 00000110 10000000
+y1 := y0 ^ ((y0 << s) AND c) = 10011010 11010001 00110011 10011101
+```
+
+Again, we are given `y1`, `s` and `c`, and have to recover `y0`. Similarly to the previous case, we see that the `s = 7` least-significant bits of `y0` got XORed with zeros, thus copying them exactly. We use a similar approach and keep shifting the `s = 7` bits, eventually recovering the full `y0`. We only need to take care and AND them with the constant `c` before XORing. Continuing the example (again denoting the recovered bits by `^`):
+
+```
+x0 := y1                       = 10011010 11010001 00110011 10011101
+                                                             ^^^^^^^
+x0 << s                        = 01101000 10011001 11001110 10000000
+(x0 << s) AND c                = 00001000 00001000 01000110 10000000
+x1 := y1 XOR ((x0 << s) AND c) = 10010010 11011001 01110101 00011101
+                                                     ^^^^^^ ^^^^^^^^
+x1 << s                        = 01101100 10111010 10001110 10000000
+(x1 << s) AND c                = 00001100 00101000 00000110 10000000
+x2 := y1 XOR ((x1 << s) AND c) = 10010110 11111001 00110101 00011101
+                                             ^^^^^ ^^^^^^^^ ^^^^^^^^
+x2 << s                        = 01111100 10011010 10001110 10000000
+(x2 << s) AND c                = 00011100 00001000 00000110 10000000
+x3 := y1 XOR ((x2 << s) AND c) = 10000110 11011001 00110101 00011101
+                                     ^^^^ ^^^^^^^^ ^^^^^^^^ ^^^^^^^^
+x3 << s                        = 01101100 10011010 10001110 10000000
+(x3 << s) AND c                = 00001100 00001000 00000110 10000000
+x4 := y1 XOR ((x3 << s) AND c) = 10010110 11011001 00110101 00011101
+                                 ^^^^^^^^ ^^^^^^^^ ^^^^^^^^ ^^^^^^^^
+```
+
+The algorithm can be expressed as follows:
+
+```
+revert-left-shift(y1, s, c):
+  x = y1
+  for i = 0, ..., 32 / s + 1:
+    x = y XOR ((x << s) AND c)
+  return x
+```
+
+## Mitigation
+
+The challenge asks us what would happen if the tempered output was transformed with a cryptographic hash function before returning. Because the whole point of a cryptographic hash function is to not be reversible, this would solve the reversibility problem. At the same time, the hashing operation would slow the algorithm down. It also feels like patching a non-cryptographically secure algorithm (by design) to become one. Instead, it would be better to use one of the methods designed from the start to be non-reversible.
+
 # [Challenge 24](https://cryptopals.com/sets/3/challenges/24)
