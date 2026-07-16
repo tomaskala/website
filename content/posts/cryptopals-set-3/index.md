@@ -240,3 +240,12 @@ revert-left-shift(y1, s, c):
 The challenge asks us what would happen if the tempered output was transformed with a cryptographic hash function before returning. Because the whole point of a cryptographic hash function is to not be reversible, this would solve the reversibility problem. At the same time, the hashing operation would slow the algorithm down. It also feels like patching a non-cryptographically secure algorithm (by design) to become one. Instead, it would be better to use one of the methods designed from the start to be non-reversible.
 
 # [Challenge 24](https://cryptopals.com/sets/3/challenges/24)
+
+The last challenge has two parts. In the first one, we use the MT19937 generator's output as a keystream and XOR it with a plaintext to form a ciphertext, kind of like a poor man's stream cipher. There are several problems with this:
+
+1. We saw in the previous challenge that given enough output, the MT19937 generator can be reversed. The attacker could simply feed the cipher a known plaintext, XOR it again with the ciphertext, obtain the key stream, and recompute the original seed from that.
+2. The generator uses 32-bit seeds, and 2^32 values can be easily bruteforced.
+
+The challenge makes this even easier by only using a 16-bit seed. Given a plaintext and a ciphertext pair, we can easily try out all the 2^16 possible values, decrypt the ciphertext with the candidate seed, and compare with the plaintext. The challenge actually has us prepend a random prefix before encrypting, but that just means we compare the suffixes.
+
+In the second part, we use the MT19937 generator to generate a random password reset token, using the Unix timestamp as the seed. Similarly to Challenge 22, there just isn't enough entropy in the current time. We can just try out all the values between now and a reasonable value in the past (I went for [now - 60 x 60 x 24 seconds, now]), generate a token with that seed, and compare with the actual token.
