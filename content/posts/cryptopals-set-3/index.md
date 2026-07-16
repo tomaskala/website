@@ -7,6 +7,17 @@ The third set of the [cryptopals](https://cryptopals.com/) challenges starts wit
 
 My solutions can again be found on [GitHub](https://github.com/tomaskala/cryptopals).
 
+# Lessons learned
+
+We continue in learning how broken block ciphers can be. Then we learn how a block cipher can be converted into a stream cipher. Finally, we learn to be very careful around randomness in cryptography.
+
+- Don't use block ciphers in the CBC mode, the ciphertext can be decrypted by utilizing API or timing side-channels ([Challenge 17](#challenge-17httpscryptopalscomsets3challenges17)).
+- Any block cipher can be converted into a stream cipher by using the CTR mode of operation, though this isn't the only possible mode ([Challenge 18](#challenge-18httpscryptopalscomsets3challenges18)).
+- If you use a stream cipher, you must never reuse the nonce to encrypt multiple messages. This would allow the attacker to decrypt the messages if they know, guess or can analyze something about their contents ([Challenge 19](#challenge-19httpscryptopalscomsets3challenges19), [Challenge 20](#challenge-20httpscryptopalscomsets3challenges20)).
+- Use a high-entropy randomness source. Even a cryptographically-secure random generator cannot save you if the attacker can bruteforce the entropy source ([Challenge 22](#challenge-22httpscryptopalscomsets3challenges22), [Challenge 24](#challenge-24httpscryptopalscomsets3challenges24)).
+- Don't use non-cryptographically-secure random generators for cryptography. Their operations can be reversed and their state cloned given enough output. This allows the attacker to generate exactly the same secrets as we would ([Challenge 23](#challenge-23httpscryptopalscomsets3challenges23)).
+- Although it is technically possible to use a random generator's output as a keystream, don't do it ([Challenge 24](#challenge-24httpscryptopalscomsets3challenges24)).
+
 # [Challenge 17](https://cryptopals.com/sets/3/challenges/17)
 
 We will implement a famous attack that completely destroys the CBC mode of operation, which we have started breaking in the [previous set](/posts/cryptopals-set-2).

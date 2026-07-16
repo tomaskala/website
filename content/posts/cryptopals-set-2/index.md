@@ -9,6 +9,16 @@ Most of the tasks focus on thoroughly breaking the ECB mode, which is the simple
 
 As before, my implementation can be found on [GitHub](https://github.com/tomaskala/cryptopals).
 
+# Lessons learned
+
+We mostly learned not to use block ciphers, because even if the encryption algorithm (such as AES) is secure, the mode of operation can break the cipher in non-obvious ways.
+
+- Block ciphers need their input padded to the block size ([Challenge 09](#challenge-09httpscryptopalscomsets2challenges9)).
+- An oracle represents the system being attacked. It has access to information we as an attacker do not, such as the encryption keys ([Challenge 11](#challenge-11httpscryptopalscomsets2challenges11)).
+- Don't use block ciphers in the ECB mode, the plaintext can be decrypted ([Challenge 12](#challenge-12httpscryptopalscomsets2challenges12), [Challenge 14](#challenge-14httpscryptopalscomsets2challenges14)).
+- Don't use block ciphers in the ECB mode, the blocks can be cut and pasted. This allows the attacker to manipulate the ciphertext in a way that affects the plaintext, even if your API validation is correct ([Challenge 13](#challenge-13httpscryptopalscomsets2challenges13)).
+- Don't use block ciphers in the CBC mode, the ciphertext can be edited in a way that affects the plaintext ([Challenge 16](#challenge-16httpscryptopalscomsets2challenges16)).
+
 # [Challenge 09](https://cryptopals.com/sets/2/challenges/9)
 
 The ninth challenge has us implement the PKCS#7 padding scheme, which is a particular way of padding a message with extra bytes to be a multiple of the cipher's block size.

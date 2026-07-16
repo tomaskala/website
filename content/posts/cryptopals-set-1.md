@@ -11,6 +11,14 @@ My implementation can be found on [GitHub](https://github.com/tomaskala/cryptopa
 
 Because the first set serves as an introduction, there isn't that much to learn from it, so this post is rather short. This will change in the upcoming sets once we get to break some actual cryptography!
 
+# Lessons learned
+
+This set is an introduction, so there aren't that many.
+
+- If you do anything involving cryptography, it's good to get familiar with your language's standard library. For example by doing the cryptopals challenges!
+- Don't use ciphers from ancient Rome ([Challenge 03](#challenge-03httpscryptopalscomsets1challenges3)) or from the renaissance ([Challenge 06](#challenge-06httpscryptopalscomsets1challenges6)).
+- Don't use block ciphers in the ECB mode, it can be trivially detected ([Challenge 08](#challenge-08httpscryptopalscomsets1challenges8)).
+
 # [Challenge 01](https://cryptopals.com/sets/1/challenges/1)
 
 I think the first challenge just wants us become familiar with our language's standard library and how to call hex- and base64- decoding and encoding functions. It also reminds us to always perform all cryptographical operations on raw bytes instead of strings - we do not want any encoding to get in the way. From cryptography's point of view, all data it operates on are just numerical values, and the fact that they can (sometimes) be interpreted as human-readable strings is just a coincidence.
