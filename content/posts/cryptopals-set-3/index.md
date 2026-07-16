@@ -1,7 +1,6 @@
 ---
 title: "Cryptopals - Set 3"
-date: 2026-07-10T22:18:00+02:00
-draft: true
+date: 2026-07-16T17:16:03+02:00
 ---
 
 The third set of the [cryptopals](https://cryptopals.com/) challenges starts with the famous CBC padding oracle attack. It then continues with several challenges focused on the CTR mode, which transforms a block cipher into a stream cipher. Finally, we will see why it's a bad idea to use non-cryptographically-secure random generators when doing cryptography. Let's get started!
@@ -21,7 +20,7 @@ Neither the encryption key nor the plaintext is ever revealed to us. We use the 
 
 ## Background
 
-The oracle simulates an API that returns different kind of error messages based on whether the padding is wrong or not. We can imagine that there is logic such as
+The oracle simulates an API that returns different kind of error messages based on whether the padding is wrong or not. We can imagine that there is some logic such as
 ```
 endpoint(encrypted-cookie):
   cookie, ok = unpad(decrypt(encrypted-cookie))
@@ -35,7 +34,7 @@ endpoint(encrypted-cookie):
   ... do something with user-profile ...
 ```
 
-We pass a suitably crafted ciphertext, and receive a different response based on whether the underlying plaintext's padding is valid or not. Because of how we modify the ciphertext, the plaintext will almost certainly become corrupted and fail to parse. That's OK though; all we care about is knowing whether the padding is valid (for example `\x03\x03\x03`) or not (for example `\x01\x02\x03`).
+We pass a suitably crafted ciphertext, and receive a different response based on whether the underlying plaintext's padding is valid or not. Because of how we modify the ciphertext, it will almost certainly decrypt to some nonsense and fail to parse. That's OK though; all we care about is knowing whether the padding is valid (for example `\x03\x03\x03`) or not (for example `\x01\x02\x03`).
 
 If the endpoint didn't return different error messages for the two cases, we could still utilize timing information - correct padding also has to parse the cookie, so it would take slightly longer than the padding validation by itself.
 
@@ -74,7 +73,7 @@ The question is how to form the state. If we simply started at 0 and incremented
 1. The nonce ("number used only once"), which must be unique for each message we encrypt; otherwise, they would be XORed with the same key stream.
 2. The counter, which increments for each block.
 
-The other nice thing is that we don't need to write a separate decryption function. Because XOR is symmetric, we can just encrypt the ciphertext with the same key stream to get back the plaintext.
+The nice thing is that we don't need to write a separate decryption function. Because XOR is symmetric, we can just encrypt the ciphertext with the same key stream to get back the plaintext.
 
 # [Challenge 19](https://cryptopals.com/sets/3/challenges/19)
 
@@ -92,13 +91,13 @@ ciphertext3 = plaintext3 XOR keystream
 ciphertext4 = plaintext4 XOR keystream
 ```
 
-Because the key stream is always the same, all the bytes in the i-th column have been XORed with the same key byte. Does that remind you of anything? That's almost exactly how we broke the Vigenère cipher in the [first set](/posts/cryptopals-set-1). The key doesn't repeat here, but otherwise, we can again recover it byte by byte by considering the successive column. The only problem is that the further we go, the less data we have: the shorter strings will end, leaving us with only a handful of longer strings to work with. As such, we will typically miss the last few bytes. We can still recover the beginning almost perfectly though.
+Because the key stream is always the same, all the bytes in the i-th column have been XORed with the same key byte. Does that remind you of anything? That's almost exactly how we broke the Vigenère cipher in the [first set](/posts/cryptopals-set-1). The key doesn't repeat here, but otherwise, we can again recover it byte by byte by considering the individual columns. The only problem is that the further we go, the less data we have: the shorter strings will end, leaving us with only a handful of longer strings to work with. As such, we will typically miss the last few bytes. We can still recover the beginning almost perfectly though.
 
-The lesson here is that if you reuse a nonce for encrypting multiple messages in the CTR mode, your encryption can be trivially broken. Never reuse the nonce.
+The lesson here is that if you reuse a nonce for encrypting multiple messages in the CTR mode, your encryption can be trivially broken.
 
 # [Challenge 21](https://cryptopals.com/sets/3/challenges/21)
 
-In this challenge, we implement the famous Mersenne Twister random number generator. Rather than trying to explain how it works, I'll just link the home page with the reference implementation and test vector: <https://www.math.sci.hiroshima-u.ac.jp/m-mat/MT/emt.html>. We will use it in the following challenges to show how an unsafe random number generation can break your cryptography.
+In this challenge, we implement the famous Mersenne Twister random number generator. Rather than trying to explain how it works, I'll just link its home page with the reference implementation and test vector: <https://www.math.sci.hiroshima-u.ac.jp/m-mat/MT/emt.html>. We will use it in the following challenges to show how unsafe random number generation can break your cryptography.
 
 # [Challenge 22](https://cryptopals.com/sets/3/challenges/22)
 
@@ -111,7 +110,7 @@ To calculate the entropy, suppose the following:
 
 Assume we use the usual Unix timestamp that measures the number of non-leap seconds elapsed since 00:00:00 UTC, January 1 1970. The attacker then needs to iterate over all seconds in the interval `[T1, T2]`, instantiate a new MT19937 generator seeded with the current second, and compare its output with the captured random value. That's `T2 - T1 + 1` values in total, whose entropy is `log2(T2 - T1 + 1)` bits. Even if they wait 24 hours before capturing the random output, that's a laughable `log2(86400) ~ 16.4` bits of entropy.
 
-This only works if the attacker knows we are using the MT19937 generator. In practice, they can either guess this based on the language our service is written in (check the standard library and see what generator is used), or try several common generators at once.
+This only works if the attacker knows we are using the MT19937 generator. In practice, they can either guess this based on the language our service is written in (check the standard library and see what generator is used), or try several common generators.
 
 I didn't want the tests to take a long time, so instead of sleeping several seconds and using the Unix timestamp as the seed like the task suggested, I converted everything to milliseconds.
 
@@ -128,7 +127,7 @@ The length of Mersenne Twister state array is 624 32-bit numbers. After initiali
 
 By observing the full run of 624 generated numbers (before a twist is applied), we can recover the state array. At this point we can clone the generator and keep producing exactly the same output as the original one. If the Mersenne Twister generator is used to generate encryption keys or any other cryptographic material, the attacker can simply capture enough output, clone the generator, and then generate the same keys.
 
-It's improbable that the attacker starts collecting the random data right after the twisting operation has been applied. Instead, they will likely start somewhere inside the twisting period. As long as they capture 2 x 624 generated numbers, they are guaranteed to observe one full run though. They can simply recover the state array, make their generator generate a number, and compare it to the next captured number. By iterating this process, they will eventually match the output, confirming that the recovered state array is correct.
+It's improbable that the attacker starts collecting the random data right after the twisting operation has been applied. Instead, they will likely start somewhere inside the twisting period. As long as they capture 2 x 624 generated numbers, they are guaranteed to observe one full run though. They can then recover the state array, make their generator output a number, and compare it to the next captured number. By iterating this process, they will eventually match the output, confirming that the recovered state array is correct.
 
 ## Attack
 
@@ -155,9 +154,11 @@ Both these operations are reversible. Once we find the reverse, we can apply the
 
 ### Inverting the right shift
 
-Let's start with reverting the right shift: `y1 := y0 XOR (y0 >> s)`. At first, it looks like we are losing some information - by shifting a value to the right by `s`, we throw away the `s` most-significant bits. If that was all we were doing, then yes, we would be throwing something away. However, what we are doing on top is XOR this with the original value. Consider this example:
+Let's start with reverting the right shift: `y1 := y0 XOR (y0 >> s)`. At first, it looks like we are losing some information - by shifting a value to the right by `s`, we throw away the `s` least-significant bits. If that was all we were doing, then yes, we would be throwing something away. However, what we are doing on top is XOR this with the original value. Consider this example:
 
 ```
+Tempering:
+
       s                = 11 (decimal)
       y0               = 10010110 11011001 00110101 00011101 (binary)
       y0 >> s          = 00000000 00010010 11011011 00100110 (binary)
@@ -166,9 +167,11 @@ y1 := y0 XOR (y0 >> s) = 10010110 11001011 11101110 00111011 (binary)
                          The s most-significant bits are the same as in y
 ```
 
-We are given `y1` and `s`, and have to recover `y0`. We see that by being XORed to `s = 11` zeros, the first `s = 11` bits of `y1` are the same as of `y0`. The following `s = 11` bits of `y0` were XORed with the first `s = 11` bits of `y0` (because of the shift), so by XORing them again with them, we recover the next `s = 11` bits of `y0`. We keep going in this way until the entire `y0` has been recovered. Continuing the example (denoting the recovered bits by `^`):
+We are given `y1` and `s`, and have to recover `y0`. We see that by being XORed to `s = 11` zeros, the first `s = 11` bits of `y0` get copied to `y1`. The following `s = 11` bits of `y0` are XORed with the first `s = 11` bits of `y0` (because of the shift), so by XORing them again with the same values, we recover the next `s = 11` bits of `y0`. We keep going in this way until the entire `y0` has been recovered. Continuing the example (denoting the recovered bits by `^`):
 
 ```
+Untempering:
+
 x0 := y1                = 10010110 11001011 11101110 00111011
                           ^^^^^^^^ ^^^
 x0 >> s                 = 00000000 00010010 11011001 01111101
@@ -182,8 +185,8 @@ x2 := y1 XOR (x1 >> s)  = 10010110 11011001 00110101 00011101
 The algorithm can be expressed as follows:
 
 ```
-revert-right-shift(y1, s):
-  x = y1
+revert-right-shift(y, s):
+  x = y
   for i = 0, ..., 32 / s + 1:
     x = y XOR (x >> s)
   return x
@@ -194,6 +197,8 @@ revert-right-shift(y1, s):
 Next, let's look at how to invert the left shift: `y1 := y0 XOR ((y0 << s) AND c)`. This looks scary because the XORed value is further scrambled by ANDing it with a constant, but the approach is almost the same. Let's again look at an example with the same `y0`:
 
 ```
+Tempering:
+
       s                      = 7
       c = 0x9d2c5680         = 10011101 00101100 01010110 10000000
       y0                     = 10010110 11011001 00110101 00011101
@@ -202,9 +207,11 @@ Next, let's look at how to invert the left shift: `y1 := y0 XOR ((y0 << s) AND c
 y1 := y0 ^ ((y0 << s) AND c) = 10011010 11010001 00110011 10011101
 ```
 
-Again, we are given `y1`, `s` and `c`, and have to recover `y0`. Similarly to the previous case, we see that the `s = 7` least-significant bits of `y0` got XORed with zeros, thus copying them exactly. We use a similar approach and keep shifting the `s = 7` bits, eventually recovering the full `y0`. We only need to take care and AND them with the constant `c` before XORing. Continuing the example (again denoting the recovered bits by `^`):
+Again, we are given `y1`, `s` and `c`, and have to recover `y0`. Similarly to the previous case, we see that the `s = 7` least-significant bits of `y0` get XORed with zeros, getting copied. We use a similar approach and keep shifting the `s = 7` bits, eventually recovering the full `y0`. We just need to take care to AND them with the constant `c` before XORing. Continuing the example (again denoting the recovered bits by `^`):
 
 ```
+Untempering:
+
 x0 := y1                       = 10011010 11010001 00110011 10011101
                                                              ^^^^^^^
 x0 << s                        = 01101000 10011001 11001110 10000000
@@ -228,8 +235,8 @@ x4 := y1 XOR ((x3 << s) AND c) = 10010110 11011001 00110101 00011101
 The algorithm can be expressed as follows:
 
 ```
-revert-left-shift(y1, s, c):
-  x = y1
+revert-left-shift(y, s, c):
+  x = y
   for i = 0, ..., 32 / s + 1:
     x = y XOR ((x << s) AND c)
   return x
@@ -237,7 +244,7 @@ revert-left-shift(y1, s, c):
 
 ## Mitigation
 
-The challenge asks us what would happen if the tempered output was transformed with a cryptographic hash function before returning. Because the whole point of a cryptographic hash function is to not be reversible, this would solve the reversibility problem. At the same time, the hashing operation would slow the algorithm down. It also feels like patching a non-cryptographically secure algorithm (by design) to become one. Instead, it would be better to use one of the methods designed from the start to be non-reversible.
+The challenge asks us what would happen if the tempered output was transformed with a cryptographic hash function before returning. Because the whole point of a cryptographic hash function is to not be reversible, this would solve the problem. At the same time, the hashing operation would slow the algorithm down. It also feels like patching a non-cryptographically secure algorithm (by design) to become one. Instead, it would be better to use a generator designed from the start to be cryptographically-secure.
 
 # [Challenge 24](https://cryptopals.com/sets/3/challenges/24)
 
@@ -246,6 +253,6 @@ The last challenge has two parts. In the first one, we use the MT19937 generator
 1. We saw in the previous challenge that given enough output, the MT19937 generator can be reversed. The attacker could simply feed the cipher a known plaintext, XOR it again with the ciphertext, obtain the key stream, and recompute the original seed from that.
 2. The generator uses 32-bit seeds, and 2^32 values can be easily bruteforced.
 
-The challenge makes this even easier by only using a 16-bit seed. Given a plaintext and a ciphertext pair, we can easily try out all the 2^16 possible values, decrypt the ciphertext with the candidate seed, and compare with the plaintext. The challenge actually has us prepend a random prefix before encrypting, but that just means we compare the suffixes.
+The challenge makes this even easier by only using a 16-bit seed. Given a plaintext and a ciphertext pair, we can easily try out all the 2^16 possible values, decrypt the ciphertext with the candidate seed, and compare with the plaintext. The challenge actually has us prepend a random prefix before encrypting, but that just means we compare the suffixes instead of the full strings.
 
-In the second part, we use the MT19937 generator to generate a random password reset token, using the Unix timestamp as the seed. Similarly to Challenge 22, there just isn't enough entropy in the current time. We can just try out all the values between now and a reasonable value in the past (I went for [now - 60 x 60 x 24 seconds, now]), generate a token with that seed, and compare with the actual token.
+In the second part, we use the MT19937 generator to generate a random password reset token, using the Unix timestamp as the seed. Similarly to Challenge 22, there just isn't enough entropy in the current time. We can quickly try out all the values between now and a reasonable value in the past (I went for [now - 60 x 60 x 24 seconds, now]), generate a token with that seed, and compare with the actual token.
