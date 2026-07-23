@@ -41,6 +41,26 @@ One possible defense against the attack would be to keep a monotonic write count
 
 # [Challenge 26](https://cryptopals.com/sets/4/challenges/26)
 
+We reimplement the oracle function from Challenge 16, but this time, we encrypt the cookie using AES-CTR. That is, we are given a function
+
+```
+ciphertext(input) = AES-CTR(prefix || sanitize(input) || suffix)
+```
+
+We again have to edit `ciphertext(input)` so that `;admin=true;` appears in the plaintext.
+
+In Challenge 16, we relied on the fact that editing a ciphertext block under CBC mode performs the same edits in the next ciphertext block (though it completely scrambles the edited block). With the CTR mode, the task is even simpler. Because the ciphertext is constructed by XORing the plaintext with a keystream, any edits we perform on the ciphertext affect the plaintext on the same positions.
+
+We pass an input of the form `AadminAtrueA`, and then edit the ciphertext to change the three A's into `;`, `=` and `;`, respectively. Because the prefix length is 32, we change the ciphertext as follows:
+
+```
+ciphertext[32+0] = ciphertext[32+0] XOR 'A' XOR ';'
+ciphertext[32+6] = ciphertext[32+6] XOR 'A' XOR '='
+ciphertext[32+11] = ciphertext[32+11] XOR 'A' XOR ';'
+```
+
+XORing with the A's effectively clears out the plaintext on that position, and again XORing with the desired character places it there.
+
 # [Challenge 27](https://cryptopals.com/sets/4/challenges/27)
 
 # [Challenge 28](https://cryptopals.com/sets/4/challenges/28)
