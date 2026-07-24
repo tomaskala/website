@@ -63,6 +63,49 @@ XORing with the A's effectively clears out the plaintext on that position, and a
 
 # [Challenge 27](https://cryptopals.com/sets/4/challenges/27)
 
+One more task to break the CBC mode before we move on to hashing. In this scenario, we are given the following API:
+
+```
+key := generate-key()
+iv := key
+
+encrypt(plaintext):
+  return AES-CBC(plaintext, key, iv)
+
+decrypt(ciphertext):
+  plaintext := AES-CBC(ciphertext, key, iv)
+  if invalid-ascii(plaintext):
+    return error("invalid plaintext: %s", plaintext)
+```
+
+There are two issues with it:
+1. It reuses the key for the IV. This is the point of the challenge - sometimes, applications reuse the key for IV to save some space and not have to send it alongside the ciphertext. As we will see, this is dangerous, as it allows an attacker to recover the key.
+2. When it detects an invalid plaintext (non-printable ASCII characters in this case), it reports the plaintext. This can happen for example when the application doesn't sanitize its error messages before presenting them to the user.
+
+The attack works like this. A regular user calls the `encrypt` endpoint to encrypt a bytestring at least 3 blocks long. An attacker captures the ciphertext, edits it in a suitable way, and sends it to the `decrypt` endpoint. Because the edit messed up the ASCII characters, the endpoint returns an error which includes the decrypted value. This is under the assumption that when the invalid plaintext doesn't carry any sensitive information. However, the attacker carefully crafted the ciphertext in a way that the plaintext reported in the error allows recovering the encryption key.
+
+Suppose the attacker captures a ciphertext consisting of 4 blocks (we use one more than the task suggests, because we would otherwise mess up the padding and had to recompute it).
+
+```
+C1 || C2 || C3 || C4
+```
+
+They will change it into `C1 || 0 || C1 || C4` and send for decryption. This triggers the error handler, giving back
+
+```
+invalid plaintext: P1 || P2 || P3 || P4
+```
+
+Remembering how the CBC mode works, we have the following:
+
+```
+P1 = IV XOR decrypt(C1) = key XOR decrypt(C1)
+P2 = C1 XOR decrypt(C2) = C1 XOR decrypt(0)
+P3 = C2 XOR decrypt(C3) = 0 XOR decrypt(C1) = decrypt(C1)
+```
+
+By XORing P1 with P3, we get `P1 XOR P3 = (key XOR decrypt(C1)) XOR decrypt(C1) = key`, recovering the encryption key.
+
 # [Challenge 28](https://cryptopals.com/sets/4/challenges/28)
 
 # [Challenge 29](https://cryptopals.com/sets/4/challenges/29)
