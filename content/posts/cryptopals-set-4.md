@@ -108,6 +108,10 @@ By XORing P1 with P3, we get `P1 XOR P3 = (key XOR decrypt(C1)) XOR decrypt(C1) 
 
 # [Challenge 28](https://cryptopals.com/sets/4/challenges/28)
 
+The challenge has us implement the SHA-1 hash function that we will use in the next challenge. We can't just call a standard library function, because we will need to modify the SHA-1 state. I simply took the implementation from the [Go standard library](https://pkg.go.dev/crypto/sha1@go1.26.5) and copied the relevant bits to my project.
+
+We also implement a simple form of keyed hashing, where the secret key is prefixed to the message: `mac = SHA-1(K || M)`. This is notably vulnerable to length-extension attacks. Almost as if it predicted what comes next...
+
 # [Challenge 29](https://cryptopals.com/sets/4/challenges/29)
 
 # [Challenge 30](https://cryptopals.com/sets/4/challenges/30)
