@@ -54,9 +54,9 @@ In Challenge 16, we relied on the fact that editing a ciphertext block under CBC
 We pass an input of the form `AadminAtrueA`, and then edit the ciphertext to change the three A's into `;`, `=` and `;`, respectively. Because the prefix length is 32, we change the ciphertext as follows:
 
 ```
-ciphertext[32+0] = ciphertext[32+0] XOR 'A' XOR ';'
-ciphertext[32+6] = ciphertext[32+6] XOR 'A' XOR '='
-ciphertext[32+11] = ciphertext[32+11] XOR 'A' XOR ';'
+ciphertext[32+0] := ciphertext[32+0] XOR 'A' XOR ';'
+ciphertext[32+6] := ciphertext[32+6] XOR 'A' XOR '='
+ciphertext[32+11] := ciphertext[32+11] XOR 'A' XOR ';'
 ```
 
 XORing with the A's effectively clears out the plaintext on that position, and again XORing with the desired character places it there.
@@ -99,9 +99,9 @@ invalid plaintext: P1 || P2 || P3 || P4
 Remembering how the CBC mode works, we have the following:
 
 ```
-P1 = IV XOR decrypt(C1) = key XOR decrypt(C1)
-P2 = C1 XOR decrypt(C2) = C1 XOR decrypt(0)
-P3 = C2 XOR decrypt(C3) = 0 XOR decrypt(C1) = decrypt(C1)
+P1 := IV XOR decrypt(C1) = key XOR decrypt(C1)
+P2 := C1 XOR decrypt(C2) = C1 XOR decrypt(0)
+P3 := C2 XOR decrypt(C3) = 0 XOR decrypt(C1) = decrypt(C1)
 ```
 
 By XORing P1 with P3, we get `P1 XOR P3 = (key XOR decrypt(C1)) XOR decrypt(C1) = key`, recovering the encryption key.
@@ -110,9 +110,39 @@ By XORing P1 with P3, we get `P1 XOR P3 = (key XOR decrypt(C1)) XOR decrypt(C1) 
 
 The challenge has us implement the SHA-1 hash function that we will use in the next challenge. We can't just call a standard library function, because we will need to modify the SHA-1 state. I simply took the implementation from the [Go standard library](https://pkg.go.dev/crypto/sha1@go1.26.5) and copied the relevant bits to my project.
 
-We also implement a simple form of keyed hashing, where the secret key is prefixed to the message: `mac = SHA-1(K || M)`. This is notably vulnerable to length-extension attacks. Almost as if it predicted what comes next...
+We also implement a simple form of keyed hashing, where the secret key is prefixed to the message: `mac := SHA-1(K || M)`. This is notably vulnerable to length-extension attacks. Almost as if it predicted what comes next...
 
 # [Challenge 29](https://cryptopals.com/sets/4/challenges/29)
+
+In this challenge we implement a length extension attack against the SHA-1 hash. Note that SHA-1 is now [completely broken](https://shattered.io/) and shouldn't be used in production, although this challenge focuses on a different kind of attack.
+
+Previously, we have implemented a simple (and broken) keyed hash as
+
+```
+mac := SHA-1(K || M)
+```
+
+where `K` is the secret key and `M` is the authenticated message.
+
+The SHA-1 works by iteratively modifying a state of 5 32-bit integers denoted `H`. It starts with a constant state `H`, and then iterates over 512-bit-sized batches of the message, applying `H := SHA-1-compression-function(batch, H)`. This way, we can feed the hash function pieces of data one at a time, only requesting the digest once we are finished. To ensure that the total length of the message is a multiple of 512 bits, it is padded before calculating the digest. The digest then becomes the latest value of the state `H`.
+
+Because of the iterative scheme, the hash function is vulnerable to length extension attacks. Suppose we calculate `mac := SHA-1(K || M1)` and send it alongside the message `M1`. If the attacker gets hold of the MAC and the message, they can initialize a new SHA-1 hash function, set its state `H` to the captured value `mac`, and continue hashing arbitrary messages. All that without knowing the secret key `K`. They only need to recalculate the padding - it wasn't a part of the message `M`, but it was used when calculating the final state `H = mac`.
+
+Suppose the attacker wants to extend the message `M` with an additional block `M2`. Without also re-calculating the MAC, the recipient will notice that the MAC doesn't match and reject the message. The whole idea of using a keyed hash function and keeping the key `K` private is for an attacker not to be able to calculate the hash. Yet the length extension attack allows the attacker to do that without ever knowing the key. It works like this:
+
+1. Capture `(mac, M1)`.
+2. Initialize the SHA-1 hash function by setting its state `H` to `mac`. At this point, the hash function is set exactly as if it has just calculated `SHA-1(K || M1 || padding)`.
+3. Feed the extra block `M2` to the hash function and calculate the digest `new-mac`.
+4. Calculate the original padding value `padding`. For this we need to know the lengths of `K` and `M1`. We know the entire message `M1`, so its length is also known. We need to guess the length of the key `K`, but we can just try a range of reasonable values until we get the recipient to accept the message.
+5. Create the modified message `new-message := M1 || padding || M2`.
+6. Return `(new-mac, new-message)`.
+
+Because of the padding, the new message will be slightly scrambled. However, that might not be a problem, for example if it denotes URL query values. The recipient might simply split them using a separator and iterate over the resulting key-value pairs. Our injected `M2` block might then contain a string such as `admin=true`, and the fact that the previous pair became `key=value<padding-nonsense>` might not be that important.
+
+The question is how to defend against a length extension attack. The possibilities include:
+1. Appending the key instead of prepending it: calculate `mac := SHA-1(M || K)` instead of `mac := SHA-1(K || M)`. This is the simplest fix, but it trades one vulnerability for another. If the attacker finds a hash collision `SHA-1(M) = SHA-1(N)` for two different messages `M` and `N`, then it follows that `SHA-1(M || K) = SHA-1(N || K)`. As such, it's more of a theoretical exercise and not something suitable for production use.
+2. Using another hash function that isn't vulnerable to length extension attacks, such as SHA-3.
+3. Preferably, using HMAC, a scheme immune to length extension attacks, even if the underlying hash function is vulnerable to them. We will see it a little later.
 
 # [Challenge 30](https://cryptopals.com/sets/4/challenges/30)
 
