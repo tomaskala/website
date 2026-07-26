@@ -34,7 +34,7 @@ Because we will need an unpadding function later, I went ahead and implemented i
 
 # [Challenge 10](https://cryptopals.com/sets/2/challenges/10)
 
-In the ninth challenge, we implement the [CBC mode of operation](https://en.wikipedia.org/wiki/Block_cipher_mode_of_operation#Cipher_block_chaining_(CBC)). Compared to ECB, the CBC mode no longer makes the individual blocks independent and XORs the previous ciphertext with the current decrypted block. The first plaintext block, which has no previous ciphertext, instead uses a "fake ciphertext" called the initialization vector (IV).
+In the tenth challenge, we implement the [CBC mode of operation](https://en.wikipedia.org/wiki/Block_cipher_mode_of_operation#Cipher_block_chaining_(CBC)). Compared to ECB, the CBC mode no longer makes the individual blocks independent and XORs the previous ciphertext with the current decrypted block. The first plaintext block, which has no previous ciphertext, instead uses a "fake ciphertext" called the initialization vector (IV).
 
 Wikipedia has excellent diagrams that explain this better. Here is how the encryption works: ![CBC-encryption](CBC_encryption.svg)
 Notice that the encryption process cannot parallelize over blocks, because to encrypt a block, we need to XOR it with the previous ciphertext block.
@@ -144,14 +144,14 @@ We implement an oracle that accepts a plaintext, appends an unknown string to it
 
     Finally, we need to come up with a formula to determine how many A's to include in the query to the oracle. After a bit of thinking, I came up with this:
     ```
-    block-size - length(decrypted-bytes) - 1 mod block-size
+    (block-size - length(decrypted-bytes) - 1) mod block-size
     ```
     This works with the four scenarios above:
 
-    1. `8 - 0 - 1 mod 8 = 7 mod 8 = 7`
-    2. `8 - 1 - 1 mod 8 = 6 mod 8 = 6`
-    3. `8 - 7 - 1 mod 8 = 0 mod 8 = 0`
-    4. `8 - 8 - 1 mod 8 = -1 mod 8 = 7`
+    1. `(8 - 0 - 1) mod 8 = 7 mod 8 = 7`
+    2. `(8 - 1 - 1) mod 8 = 6 mod 8 = 6`
+    3. `(8 - 7 - 1) mod 8 = 0 mod 8 = 0`
+    4. `(8 - 8 - 1) mod 8 = -1 mod 8 = 7`
 
     The interpretation is that we need to start with `block-size` A's when we haven't yet decrypted anything, subtract the number of decrypted bytes (because we keep needing fewer A's as we decrypt), subtract 1 (because we need to iterate the last byte), and take the modulo by `block-size` (because we never need more than one full block.
 
