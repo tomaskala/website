@@ -146,6 +146,8 @@ The question is how to defend against a length extension attack. The possibiliti
 
 # [Challenge 30](https://cryptopals.com/sets/4/challenges/30)
 
+We repeat exactly the same length extension attack as in Challenge 29, but against the MD4 hash function. MD4 is even more broken than SHA-1 and should never be used, but the purpose of this exercise is just to demonstrate that it is also vulnerable to length extension attacks.
+
 # [Challenge 31](https://cryptopals.com/sets/4/challenges/31)
 
 # [Challenge 32](https://cryptopals.com/sets/4/challenges/32)
