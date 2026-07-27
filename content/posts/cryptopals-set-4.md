@@ -150,4 +150,35 @@ We repeat exactly the same length extension attack as in Challenge 29, but again
 
 # [Challenge 31](https://cryptopals.com/sets/4/challenges/31)
 
+As we learned before, parameterizing a hash function with a key as `hash(K || M)` isn't a good idea if the hash function is vulnerable to length extension attacks. There is an alternative hashing scheme called HMAC that isn't vulnerable to length extension attacks even if the underlying hash function is.
+
+Given a hash function `H`, a key `K` and a message `M`, the HMAC is calculated as follows:
+
+```
+HMAC-H(K, M) = H((K' XOR opad) || H((K' XOR ipad) || M))
+
+where K' is H(K) if K is larger than the block size of H, or K padded with zeros to the block size of H otherwise 
+      opad is the byte 0x5c repeated "block size of H" times
+      ipad is the byte 0x36 repeated "block size of H" times
+```
+
+The point is that the outer hash function hides the inner hash of the message, so any length extension attack wouldn't affect the message itself.
+
+We implement an oracle that accepts a string and its signature, and verifies that the signature is correct using HMAC-SHA1 with an unknown key. It suffers from a flaw though: it compares the signatures using a non-constant time comparison function. The comparison iterates over corresponding bytes of the expected and actual signatures and returns `false` as soon as it encounters two different bytes. That's how you normally compare strings or arrays for efficiency. In cryptography, we need to compare using constant-time operations - otherwise, we leak some information. Specifically, if the attacker can measure that comparison of the correct signature takes longer than the comparison of an incorrect one (because it stops as soon as it encounters different bytes), they can recover the signature of an arbitrary string.
+
+This exercise makes it easier by having the comparison function wait 50 milliseconds after every byte, so the difference is easily measurable. Unfortunately, it also makes the attack unbearably slow. I had to restrict the signature length to just 5 bytes instead of the usual 20 that SHA-1 produces, and the attack still takes almost a minute.
+
+The attack works as follows:
+
+- Allocate an zeroed-out array as long as the signature.
+- Iterate over all positions in the signature.
+- Send the signature and the string whose (real) signature we want to discover to the verification endpoint, and measure the duration. This is the baseline.
+- Iterate over all possible byte values.
+- Set the current signature position to the given byte value.
+- Send the signature and the string to the verification endpoint and measure the duration.
+- If the duration is significantly greater than the baseline, we have found the correct byte and can move to the next signature position.
+- If we haven't found a significantly greater duration, then the very first value we tried in the baseline (i.e., zero) is the correct one.
+
+Using this approach and the timing information leak, we can recover the entire signature for an arbitrary string without knowing the secret key. The HMAC scheme is absolutely secure, the only problem here was using a comparison function that doesn't work with constant time and leaks information to the attacker.
+
 # [Challenge 32](https://cryptopals.com/sets/4/challenges/32)
