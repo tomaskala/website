@@ -182,3 +182,27 @@ The attack works as follows:
 Using this approach and the timing information leak, we can recover the entire signature for an arbitrary string without knowing the secret key. The HMAC scheme is absolutely secure, the only problem here was using a comparison function that doesn't work with constant time and leaks information to the attacker.
 
 # [Challenge 32](https://cryptopals.com/sets/4/challenges/32)
+
+The task remains the same as in the previous challenge. This time however, the unsafe comparison doesn't pause for quite as long as it did before, so the time difference between a correct and incorrect signatures isn't as obvious. It can be affected by noise, such as GC pauses, the CPU being busy, etc. We can work around this using a small modification to our previous attack:
+
+```
+forge-signature(string):
+  signature := [N]byte
+  signature[0:N] := 0
+  baseline := duration(verify(string, signature))
+  for i = 0, ..., N:
+    stats := [256]int
+    for a = 0, ..., attempts:
+      for b = 0, ..., 256:
+        signature[i] := b
+        stats[b] := T(stats[b], baseline - duration(verify(string, signature)))
+    signature[i] := argmax(stats)
+```
+
+That is, we repeat the calculation several times, and calculate a particular statistics from the delta in duration in each attempt. At the end, we select the value corresponding to the highest statistics value.
+
+The reasoning is that repeated attempts will provide enough variance to cover for the random noise, and the statistics will smooth it out. The choice of statistics affects the calculation:
+
+- Mean is the easiest, but also the most susceptible to outlying values.
+- Median is more robust, but difficult to calculate incrementally.
+- I went with the minimum, which is also robust, and sounds correct - the shortest duration should be the one least affected by the surrounding noise.
