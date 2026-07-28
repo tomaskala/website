@@ -1,12 +1,21 @@
 ---
 title: "Cryptopals - Set 4"
-date: 2026-07-22T20:27:59+02:00
-draft: true
+date: 2026-07-28T21:15:59+02:00
 ---
 
 The fourth set of the [cryptopals](https://cryptopals.com/) challenges begins by revisiting the CTR and CBC modes of operation that we saw in [Set 2](/posts/cryptopals-set-2) and [Set 3](/posts/cryptopals-set-3). After that, we will implement and break some hash functions - exciting stuff!
 
 As always, my solutions can be found on [GitHub](https://github.com/tomaskala/cryptopals).
+
+# Lessons learned
+
+We first remind ourselves why reusing nonces is a bad idea. Then we learn why stream ciphers need to include an authentication mechanism, and one more reason to avoid the CBC mode. Finally, we learn what to watch out for around cryptographic hash functions, and why we should be careful around cryptographical primitives.
+
+- Don't reuse nonces. If you do, you pretty much allow the attacker to decrypt arbitrary ciphertexts ([Challenge 25](#challenge-25httpscryptopalscomsets4challenges25)).
+- Don't use stream ciphers without an authentication mechanism. Any change done to the ciphertext directly affects the plaintext ([Challenge 26](#challenge-26httpscryptopalscomsets4challenges26)).
+- Don't reuse the encryption key as the initialization vector when using the CBC mode of operation; it allows the attacker to discover the encryption key. Hopefully the previous sets convinced you not to ever use the CBC mode though ([Challenge 27](#challenge-27httpscryptopalscomsets4challenges27)).
+- When building keyed hashes out of hash functions vulnerable to length extension attacks, do not prepend the key to the hashed message. Use HMAC instead ([Challenge 29](#challenge-29httpscryptopalscomsets4challenges29), [Challenge 30](#challenge-30httpscryptopalscomsets4challenges30)).
+- When building cryptographical algorithms, use the correct primitives such as constant-time cryptographic comparisons ([Challenge 31](#challenge-31httpscryptopalscomsets4challenges31), [Challenge 32](#challenge-32httpscryptopalscomsets4challenges32)).
 
 # [Challenge 25](https://cryptopals.com/sets/4/challenges/25)
 
@@ -14,13 +23,13 @@ An unknown plaintext has been encrypted using AES-CTR. We can only see the ciphe
 
 ```
 edit(ciphertext, offset, new-plaintext):
-  - decrypt the ciphertext using the unknown encryption key and the known nonce
-  - replace the plaintext with new-plaintext starting at the specified offset
-  - encrypt the resulting plaintext using the same unknown encryption key and the same known nonce
-  - return the new ciphertext
+  plaintext := AES-CTR(ciphertext)
+  plaintext[offset:offset+length(new-plaintext)] := new-plaintext
+  new-ciphertext := AES-CTR(plaintext)
+  return new-ciphertext
 ```
 
-Using only the ciphertext and the `edit` function, we can recover the plaintext.
+It turns out that using only the ciphertext and the `edit` function, we can recover the plaintext.
 
 Suppose we call `ciphertext' := edit(ciphertext, 0, 'A')`. The two ciphertexts differ only in the zeroth byte:
 
@@ -35,7 +44,7 @@ ciphertext[0] XOR ciphertext'[0] = (b0 XOR keystream[0]) XOR ('A' XOR keystream[
 
 We see that by again XORing this with the byte `A`, we recover the zeroth byte of the plaintext. We can simply repeat this along the entire ciphertext, modifying one byte at a time. Alternatively, we can speed this up by working with blocks of data, writing and XORing perhaps 16 bytes at a time, or even doing it in one operation and replacing the entire plaintext. We could even get rid of the final XOR with `A` by writing the zero byte instead of `A`, because XORing anything with zero doesn't change the value.
 
-The task models a situation where an encrypted data storage supports edits on a given offset while keeping the data encrypted. The problem is that the nonce is reused between the writes, so all encryption operations use the same keystream. As we saw in the previous set, reusing the nonce has catastrophic consequences.
+The task models a situation where an encrypted data storage supports edits on a given offset while keeping the data encrypted. The problem is that the nonce is reused between the writes, so all encryption operations use the same keystream. As we also saw in the previous set, reusing the nonce has catastrophic consequences.
 
 One possible defense against the attack would be to keep a monotonic write counter and using it as the nonce. That way, every write operation uses a different nonce, and by extension a different keystream.
 
@@ -47,7 +56,7 @@ We reimplement the oracle function from Challenge 16, but this time, we encrypt 
 ciphertext(input) = AES-CTR(prefix || sanitize(input) || suffix)
 ```
 
-We again have to edit `ciphertext(input)` so that `;admin=true;` appears in the plaintext.
+We again have to edit `ciphertext(input)` so that `;admin=true;` appears in the plaintext. Due to the input sanitization, we cannot simply inject it.
 
 In Challenge 16, we relied on the fact that editing a ciphertext block under CBC mode performs the same edits in the next ciphertext block (though it completely scrambles the edited block). With the CTR mode, the task is even simpler. Because the ciphertext is constructed by XORing the plaintext with a keystream, any edits we perform on the ciphertext affect the plaintext on the same positions.
 
@@ -78,19 +87,23 @@ decrypt(ciphertext):
     return error("invalid plaintext: %s", plaintext)
 ```
 
-There are two issues with it:
-1. It reuses the key for the IV. This is the point of the challenge - sometimes, applications reuse the key for IV to save some space and not have to send it alongside the ciphertext. As we will see, this is dangerous, as it allows an attacker to recover the key.
+There are two issues with this API:
+1. It reuses the key for the IV. This is the point of the challenge - sometimes, applications reuse the key as the IV to save some space and avoid sending it alongside the ciphertext. As we will see, this is dangerous, as it allows an attacker to recover the key.
 2. When it detects an invalid plaintext (non-printable ASCII characters in this case), it reports the plaintext. This can happen for example when the application doesn't sanitize its error messages before presenting them to the user.
 
-The attack works like this. A regular user calls the `encrypt` endpoint to encrypt a bytestring at least 3 blocks long. An attacker captures the ciphertext, edits it in a suitable way, and sends it to the `decrypt` endpoint. Because the edit messed up the ASCII characters, the endpoint returns an error which includes the decrypted value. This is under the assumption that when the invalid plaintext doesn't carry any sensitive information. However, the attacker carefully crafted the ciphertext in a way that the plaintext reported in the error allows recovering the encryption key.
+When an attacker is able to capture a ciphertext send by a regular user, they can modify it and query the `decrypt` endpoint to recover the encryption key:
 
-Suppose the attacker captures a ciphertext consisting of 4 blocks (we use one more than the task suggests, because we would otherwise mess up the padding and had to recompute it).
+1. A regular user calls the `encrypt` endpoint to encrypt a bytestring at least 3 blocks long.
+2. An attacker captures the ciphertext, edits it in a suitable way, and sends it to the `decrypt` endpoint.
+3. Because the edit messed up the ASCII characters, the endpoint returns an error which includes the decrypted value. This is under the assumption that when the invalid plaintext doesn't carry any sensitive information. However, the attacker carefully crafted the ciphertext in a way that the plaintext reported in the error allows recovering the encryption key.
+
+Suppose the attacker captures a ciphertext consisting of 4 blocks (we use one more than the task suggests, because otherwise we would mess up the padding and had to recompute it).
 
 ```
 C1 || C2 || C3 || C4
 ```
 
-They will change it into `C1 || 0 || C1 || C4` and send for decryption. This triggers the error handler, giving back
+They will change it into `C1 || 0 || C1 || C4` and send to the `decrypt` endpoint. This triggers the error handler, giving back
 
 ```
 invalid plaintext: P1 || P2 || P3 || P4
@@ -108,7 +121,7 @@ By XORing P1 with P3, we get `P1 XOR P3 = (key XOR decrypt(C1)) XOR decrypt(C1) 
 
 # [Challenge 28](https://cryptopals.com/sets/4/challenges/28)
 
-The challenge has us implement the SHA-1 hash function that we will use in the next challenge. We can't just call a standard library function, because we will need to modify the SHA-1 state. I simply took the implementation from the [Go standard library](https://pkg.go.dev/crypto/sha1@go1.26.5) and copied the relevant bits to my project.
+The challenge has us implement the SHA-1 hash function that we will use in the next challenge. We can't just call a standard library function, because we will later need to modify the SHA-1 state. I simply took the implementation from the [Go standard library](https://pkg.go.dev/crypto/sha1@go1.26.5) and copied the relevant bits to my project.
 
 We also implement a simple form of keyed hashing, where the secret key is prefixed to the message: `mac := SHA-1(K || M)`. This is notably vulnerable to length-extension attacks. Almost as if it predicted what comes next...
 
@@ -116,19 +129,19 @@ We also implement a simple form of keyed hashing, where the secret key is prefix
 
 In this challenge we implement a length extension attack against the SHA-1 hash. Note that SHA-1 is now [completely broken](https://shattered.io/) and shouldn't be used in production, although this challenge focuses on a different kind of attack.
 
-Previously, we have implemented a simple (and broken) keyed hash as
+In the previous challenge, we implemented a simple (and broken) keyed hash as
 
 ```
 mac := SHA-1(K || M)
 ```
 
-where `K` is the secret key and `M` is the authenticated message.
+where `K` is the secret key and `M` is the message being authenticated.
 
 The SHA-1 works by iteratively modifying a state of 5 32-bit integers denoted `H`. It starts with a constant state `H`, and then iterates over 512-bit-sized batches of the message, applying `H := SHA-1-compression-function(batch, H)`. This way, we can feed the hash function pieces of data one at a time, only requesting the digest once we are finished. To ensure that the total length of the message is a multiple of 512 bits, it is padded before calculating the digest. The digest then becomes the latest value of the state `H`.
 
-Because of the iterative scheme, the hash function is vulnerable to length extension attacks. Suppose we calculate `mac := SHA-1(K || M1)` and send it alongside the message `M1`. If the attacker gets hold of the MAC and the message, they can initialize a new SHA-1 hash function, set its state `H` to the captured value `mac`, and continue hashing arbitrary messages. All that without knowing the secret key `K`. They only need to recalculate the padding - it wasn't a part of the message `M`, but it was used when calculating the final state `H = mac`.
+Because of this iterative scheme, the hash function is vulnerable to length extension attacks. Suppose we calculate `mac := SHA-1(K || M1)` and send it alongside the message `M1`. If the attacker gets hold of the MAC and the message, they can initialize a new SHA-1 hash function, set its state `H` to the captured value `mac`, and continue hashing arbitrary messages. All that without knowing the secret key `K`. They only need to recalculate the padding - it wasn't a part of the message `M`, but it was used when calculating the final state `H = mac`.
 
-Suppose the attacker wants to extend the message `M` with an additional block `M2`. Without also re-calculating the MAC, the recipient will notice that the MAC doesn't match and reject the message. The whole idea of using a keyed hash function and keeping the key `K` private is for an attacker not to be able to calculate the hash. Yet the length extension attack allows the attacker to do that without ever knowing the key. It works like this:
+Suppose the attacker wants to extend the message `M1` with an additional block `M2`. They cannot just append `M2` to `M1` and send it to the recipient, because they would immediately notice that the MAC doesn't match and reject it. That's the whole point of authenticating the message after all. The attacker thus needs to also modify the hash to the correct value for the forged message `M1 || M2`. They shouldn't be able to do that without knowing the secret key `K`, but the length extension attack circumvents that:
 
 1. Capture `(mac, M1)`.
 2. Initialize the SHA-1 hash function by setting its state `H` to `mac`. At this point, the hash function is set exactly as if it has just calculated `SHA-1(K || M1 || padding)`.
@@ -137,12 +150,12 @@ Suppose the attacker wants to extend the message `M` with an additional block `M
 5. Create the modified message `new-message := M1 || padding || M2`.
 6. Return `(new-mac, new-message)`.
 
-Because of the padding, the new message will be slightly scrambled. However, that might not be a problem, for example if it denotes URL query values. The recipient might simply split them using a separator and iterate over the resulting key-value pairs. Our injected `M2` block might then contain a string such as `admin=true`, and the fact that the previous pair became `key=value<padding-nonsense>` might not be that important.
+Because of the padding, the new message will be slightly scrambled. However, that might not be a problem, for example if it represents URL query values. The recipient might simply split them using a separator and iterate over the resulting key-value pairs. Our injected `M2` block might then contain a string such as `admin=true`, and the fact that the previous pair became `key=value<padding-nonsense>` might not be that important.
 
 The question is how to defend against a length extension attack. The possibilities include:
 1. Appending the key instead of prepending it: calculate `mac := SHA-1(M || K)` instead of `mac := SHA-1(K || M)`. This is the simplest fix, but it trades one vulnerability for another. If the attacker finds a hash collision `SHA-1(M) = SHA-1(N)` for two different messages `M` and `N`, then it follows that `SHA-1(M || K) = SHA-1(N || K)`. As such, it's more of a theoretical exercise and not something suitable for production use.
 2. Using another hash function that isn't vulnerable to length extension attacks, such as SHA-3.
-3. Preferably, using HMAC, a scheme immune to length extension attacks, even if the underlying hash function is vulnerable to them. We will see it a little later.
+3. Using HMAC, a scheme immune to length extension attacks, even if the underlying hash function is vulnerable to them. We will see it a little later.
 
 # [Challenge 30](https://cryptopals.com/sets/4/challenges/30)
 
@@ -152,7 +165,7 @@ We repeat exactly the same length extension attack as in Challenge 29, but again
 
 As we learned before, parameterizing a hash function with a key as `hash(K || M)` isn't a good idea if the hash function is vulnerable to length extension attacks. There is an alternative hashing scheme called HMAC that isn't vulnerable to length extension attacks even if the underlying hash function is.
 
-Given a hash function `H`, a key `K` and a message `M`, the HMAC is calculated as follows:
+Given a hash function `H`, a key `K` and a message `M`, HMAC-H is calculated as follows:
 
 ```
 HMAC-H(K, M) = H((K' XOR opad) || H((K' XOR ipad) || M))
@@ -164,39 +177,48 @@ where K' is H(K) if K is larger than the block size of H, or K padded with zeros
 
 The point is that the outer hash function hides the inner hash of the message, so any length extension attack wouldn't affect the message itself.
 
-We implement an oracle that accepts a string and its signature, and verifies that the signature is correct using HMAC-SHA1 with an unknown key. It suffers from a flaw though: it compares the signatures using a non-constant time comparison function. The comparison iterates over corresponding bytes of the expected and actual signatures and returns `false` as soon as it encounters two different bytes. That's how you normally compare strings or arrays for efficiency. In cryptography, we need to compare using constant-time operations - otherwise, we leak some information. Specifically, if the attacker can measure that comparison of the correct signature takes longer than the comparison of an incorrect one (because it stops as soon as it encounters different bytes), they can recover the signature of an arbitrary string.
+We implement an oracle that accepts a string and its signature, and verifies that the signature is correct using HMAC-SHA1 with an unknown key. So far so good. There is a problem though: it compares the signatures using a non-constant time comparison function. The comparison iterates over corresponding bytes of the expected and actual signatures and returns `false` as soon as it encounters two different bytes. That's how you normally compare strings or arrays for efficiency. In cryptography, we need to compare using constant-time operations - otherwise, we leak some information. If the attacker can measure that comparison of the correct signature takes longer than the comparison of an incorrect one (because it stops as soon as it encounters different bytes), they can recover the signature of an arbitrary string in linear instead of exponential time.
 
-This exercise makes it easier by having the comparison function wait 50 milliseconds after every byte, so the difference is easily measurable. Unfortunately, it also makes the attack unbearably slow. I had to restrict the signature length to just 5 bytes instead of the usual 20 that SHA-1 produces, and the attack still takes almost a minute.
+This exercise makes it easier by having the comparison function wait 50 milliseconds after every byte, so the difference is easily measurable. Unfortunately, it also makes the attack unbearably slow. I had to restrict the signature length to just 5 bytes instead of the usual 20 that SHA-1 produces, and the computation still takes almost a minute.
 
 The attack works as follows:
 
-- Allocate an zeroed-out array as long as the signature.
-- Iterate over all positions in the signature.
-- Send the signature and the string whose (real) signature we want to discover to the verification endpoint, and measure the duration. This is the baseline.
-- Iterate over all possible byte values.
-- Set the current signature position to the given byte value.
-- Send the signature and the string to the verification endpoint and measure the duration.
-- If the duration is significantly greater than the baseline, we have found the correct byte and can move to the next signature position.
-- If we haven't found a significantly greater duration, then the very first value we tried in the baseline (i.e., zero) is the correct one.
+```
+forge-signature(string, N):
+  signature := [N]byte
+  signature[0:N] := 0
+  for i = 0, ..., N:
+    baseline := duration(verify(string, signature))
+    found := false
+    for b = 0, ..., 256:
+      signature[i] := b
+      if baseline - duration(verify(string, signature)) is significantly greater than baseline:
+        found := true
+        break
+    if not found:
+      signature[i] := 0
+  return signature
+```
 
-Using this approach and the timing information leak, we can recover the entire signature for an arbitrary string without knowing the secret key. The HMAC scheme is absolutely secure, the only problem here was using a comparison function that doesn't work with constant time and leaks information to the attacker.
+Using this approach and the timing information leak, we can recover the entire signature for an arbitrary string without knowing the secret key. There is nothing wrong with the HMAC scheme, which is in fact perfectly secure. The problem here is using a comparison function that doesn't work in constant time with respect to the input contents.
 
 # [Challenge 32](https://cryptopals.com/sets/4/challenges/32)
 
 The task remains the same as in the previous challenge. This time however, the unsafe comparison doesn't pause for quite as long as it did before, so the time difference between a correct and incorrect signatures isn't as obvious. It can be affected by noise, such as GC pauses, the CPU being busy, etc. We can work around this using a small modification to our previous attack:
 
 ```
-forge-signature(string):
+forge-signature(string, N, attempts):
   signature := [N]byte
   signature[0:N] := 0
-  baseline := duration(verify(string, signature))
   for i = 0, ..., N:
+    baseline := duration(verify(string, signature))
     stats := [256]int
-    for a = 0, ..., attempts:
+    for 0, ..., attempts:
       for b = 0, ..., 256:
         signature[i] := b
         stats[b] := T(stats[b], baseline - duration(verify(string, signature)))
     signature[i] := argmax(stats)
+  return signature
 ```
 
 That is, we repeat the calculation several times, and calculate a particular statistics from the delta in duration in each attempt. At the end, we select the value corresponding to the highest statistics value.
@@ -205,4 +227,4 @@ The reasoning is that repeated attempts will provide enough variance to cover fo
 
 - Mean is the easiest, but also the most susceptible to outlying values.
 - Median is more robust, but difficult to calculate incrementally.
-- I went with the minimum, which is also robust, and sounds correct - the shortest duration should be the one least affected by the surrounding noise.
+- I used the minimum, which is also robust and easily interpretable - the shortest duration should be the one least affected by the surrounding noise.
