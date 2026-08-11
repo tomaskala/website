@@ -56,3 +56,45 @@ The MITM attack we implement here is slightly different and actually has Eve inj
 4. Eve again captures and drops the packet. She again sends Alice `p` in place of Bob's public key.
 
 Alice calculates her shared secret as `s = p^a = 0 mod p`. The same holds for Bob: `s = p^b = 0 mod p`. With this parameter injection, Eve can decrypt and read all messages, because she knows they have been encrypted with a key derived from a zero shared secret.
+
+# [Challenge 35](https://cryptopals.com/sets/5/challenges/35)
+
+We continue playing with parameter injection to the Diffie-Hellman key exchange. This time, we have Eve supply different values of `g`, the group generator, and analyze what effect they have on the shared secret that Alice and Bob agree on.
+
+First, we try `g = 1`. The numbers involved in the key exchange become:
+
+1. Alice's public key: `A = g^a = 1^a = 1 mod p`.
+2. Bob's public key: `B = g^b = 1^b = 1 mod p`.
+3. Shared secret: `s = A^b = 1^b = 1 mod p` and `s = B^a = 1^a = 1 mod p`.
+
+Next, we try `g = p`. Running the calculations again, we have:
+
+1. Alice's public key: `A = g^a = p^a = 0 mod p`.
+2. Bob's public key: `B = g^b = p^b = 0 mod p`.
+3. Shared secret: `s = A^b = 0^b = 0 mod p` and `s = B^a = 0^a = 0 mod p`.
+
+Finally, we try `g = p-1`. This one is more interesting. Let's first see what happens when the exponent is 1:
+
+```
+g^1 = (p-1)^1 = p-1 mod p
+```
+
+Clearly, taking the remainder after dividing `p-1` with `p` is again `p-1`. Let's now try with an exponent of 2:
+
+```
+g^2 = (p-1)^2 = (p-1)*(p-1) = p^2 - 2p + 1 = p*p - 2p + 1 = 0*0 - 2*0 + 1 = 1 mod p
+```
+
+This generalizes for arbitrary odd or even powers:
+
+```
+g^(2k+1) = (p-1)^(2k+1) = (p-1)*(p-1)^(2k) = (p-1)*((p-1)^2)^k = (p-1)*1^k = p-1 mod p
+
+g^(2k) = (p-1)^2k = ((p-1)^2)^k = 1^k = 1 mod p
+
+(k is an arbitrary integer)
+```
+
+Eve has to try both secrets to derive the encryption key and pick the one that works.
+
+In each case, Eve can deduce what secret was used to derive the encryption key and decrypt any message she captures. This is mostly an attack with a theoretical value, because as the exercise states, once someone can tamper with the key exchange parameters, chances are they can do something much worse.
