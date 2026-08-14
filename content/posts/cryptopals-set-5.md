@@ -98,3 +98,73 @@ g^(2k) = (p-1)^2k = ((p-1)^2)^k = 1^k = 1 mod p
 Eve has to try both secrets to derive the encryption key and pick the one that works.
 
 In each case, Eve can deduce what secret was used to derive the encryption key and decrypt any message she captures. This is mostly an attack with a theoretical value, because as the exercise states, once someone can tamper with the key exchange parameters, chances are they can do something much worse.
+
+# [Challenge 36](https://cryptopals.com/sets/5/challenges/36)
+
+We now move on from Diffie-Hellman and examine the closely related Secure Remote Password (SRP) protocol. It's a client-server protocol whose purpose is again to establish a shared secret between the two parties. What distinguishes it from Diffie-Hellman is the addition of client credentials - an identity and a password. The algorithm was designed so that the password is never revealed to the server. Instead, the server only stores a password-derived cryptographic verifier which is then used to validate the client. If someone steals the verifier, they can mount an offline dictionary attack to try and recover the password. That would allow them to impersonate the server to the client, but not the other way around.
+
+The protocol is kind of involved and the challenge omits a lot of details, but we're not implementing anything production-ready here. It's enough to implement the gist of it to demonstrate how it is related to Diffie-Hellman and to be able to break it in later challenges. What I'll describe below is the minimal version - full details can be found in [RFC-5054](https://datatracker.ietf.org/doc/html/rfc5054). As usual, my implementation doesn't really bother with proper error handling, locks, etc. - we're just playing with cryptography here.
+
+The client and server first agree on common parameters. These include the Diffie-Hellman prime number `p` and generator `g`, and also a value `k`. SRP-6 implemented here uses `k = 3`. The server exposes the following endpoints:
+
+```
+register(identity, salt, v):
+  store (salt, v) in a lookup table under identity
+
+exchange(identity, A):
+  (salt, v) := credentials[identity]
+  b := Diffie-Hellman private key
+  B := (k*v + g^b) mod p
+  u := SHA-256(A || B)
+  S := (A * v^u)^b mod p
+  K := SHA-256(S)
+  session-id := random value
+  store (identity, K, salt) in a lookup table under session-id
+  return session-id, salt, B
+
+validate(session-id, M1):
+  session := sessions[session-id]
+  expire sessions[session-id]
+  return HMAC-SHA-256(session.key, session.salt) == M1
+```
+
+The protocol then proceeds like this:
+
+1. The client derives credentials from its password. Only these credentials will be provided to the server; the password never leaves the client machine.
+
+```
+salt := random salt
+x := SHA-256(salt || password)
+v := g^x mod p
+credentials = (salt, v)
+```
+
+2. The client calls the `register` endpoint with its identity (for example an email) and the derived credentials.
+3. The client later wants to login to the server. It exchanges public keys using the `exchange` endpoint and verifies the login using the `validate` endpoint. The result is a boolean indicating whether the login was successful.
+
+```
+a := Diffie-Hellman private key
+A := g^a mod p (Diffie-Hellman public key based on a)
+session-id, salt, B := server.exchange(identity, A)
+
+u := SHA-256(A || B)
+x := SHA-256(salt || password)
+
+S := (B - k*g^x)^(a + u*x) mod p
+K := SHA-256(S)
+
+M1 := HMAC-SHA256(K, salt)
+server.validate(session-id, M1)
+```
+
+The last step is where the algorithm implemented in this challenge differs from the real one. In this setting, the client authenticates to the server, proving that it knows the password. In a real implementation, the server would then authenticate itself to the client and prove that it knows `v` by replying with `M2 = HMAC-SHA256(K, A || M1)`. The two parties would then use the established shared secret `K` to create an encrypted communication channel.
+
+The SRP protocol is quite complex and would deserve a more thorough treatment than this brief description. I might return to it in the future and explore it some more - provide a more realistic implementation and explore its vulnerabilities and security properties.
+
+# [Challenge 37](https://cryptopals.com/sets/5/challenges/37)
+
+# [Challenge 38](https://cryptopals.com/sets/5/challenges/38)
+
+# [Challenge 39](https://cryptopals.com/sets/5/challenges/39)
+
+# [Challenge 40](https://cryptopals.com/sets/5/challenges/40)
