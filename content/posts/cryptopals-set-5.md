@@ -163,6 +163,36 @@ The SRP protocol is quite complex and would deserve a more thorough treatment th
 
 # [Challenge 37](https://cryptopals.com/sets/5/challenges/37)
 
+It turns out that a naive implementation of the SRP protocol has a fatal flaw. If the client sends a zero (or, equivalently, an integer congruent to the prime number `p`) as its public key, it can trivially log in without knowing the password. Let's see why.
+
+When the server receives the client's public key `A`, it calculates the following:
+
+```
+exchange(identity, A):
+  (salt, v) := credentials[identity]
+  b := Diffie-Hellman private key
+  B := (k*v + g^b) mod p
+  u := SHA-256(A || B)
+  S := (A * v^u)^b mod p
+  K := SHA-256(S)
+  session-id := random value
+  store (identity, K, salt) in a lookup table under session-id
+  return session-id, salt, B
+```
+
+If `A` is zero, the entire secret becomes `S = (A * v^u)^b mod p = (0 * v^u)^b mod p = 0`. The same holds for `A = n*p`, `n` being an integer, because `mod p` reduces it to zero again. That means that the server calculates the shared secret as `K = SHA-256(0)`. The verification endpoint then reduces to this:
+
+```
+validate(session-id, M1):
+  session := sessions[session-id]
+  expire sessions[session-id]
+  return HMAC-SHA-256(SHA-256(0), session.salt) == M1
+```
+
+Because the client has (by design) access to the salt, it can send the string `M1 := HMAC-SHA-256(SHA-256(0), salt)` for verification, which trivially passes.
+
+This is a critical flaw, because it allows an attacker to impersonate an arbitrary registered client without knowing its password. The attacker can simply send the client's identifier and a zero public key for the exchange, and then login using a constant hash.
+
 # [Challenge 38](https://cryptopals.com/sets/5/challenges/38)
 
 # [Challenge 39](https://cryptopals.com/sets/5/challenges/39)
