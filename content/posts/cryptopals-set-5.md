@@ -157,7 +157,23 @@ M1 := HMAC-SHA256(K, salt)
 server.validate(session-id, M1)
 ```
 
-The last step is where the algorithm implemented in this challenge differs from the real one. In this setting, the client authenticates to the server, proving that it knows the password. In a real implementation, the server would then authenticate itself to the client and prove that it knows `v` by replying with `M2 = HMAC-SHA256(K, A || M1)`. The two parties would then use the established shared secret `K` to create an encrypted communication channel.
+The last step is where the algorithm implemented in this challenge differs from the real one. In this setting, the client authenticates to the server, proving that it knows the password. In a real implementation, the server would then authenticate itself to the client and prove that it knows `v` by replying with `M2 = HMAC-SHA256(K, A || M1)`. The two parties would then use the established shared secret `S` to create an encrypted communication channel.
+
+Let's calculate the shared secret `S` on both sides to ensure they both end up with the same value.
+
+1. The client calculates
+
+```
+S = (B - k*g^x)^(a + u*x) = (k*v + g^b - k*g^x)^(a + u*x) = (k*g^x + g^b - k*g^x)^(a + u*x) = (g^b)^(a + u*x) = (g^b)^a * (g^b)^(u*x) = g^(a*b) * g^(b*u*x) mod p
+```
+
+2. The server calculates
+
+```
+S = (A * v^u)^b = A^b * (v^u)^b = (g^a)^b * v^(u*b) = g^(a*b) * (g^x)^(u*b) = g^(a*b) * g^(b*u*x) mod p
+```
+
+Clearly both values match, so the two sides agree on the same shared secret.
 
 The SRP protocol is quite complex and would deserve a more thorough treatment than this brief description. I might return to it in the future and explore it some more - provide a more realistic implementation and explore its vulnerabilities and security properties.
 
@@ -180,7 +196,7 @@ exchange(identity, A):
   return session-id, salt, B
 ```
 
-If `A` is zero, the entire secret becomes `S = (A * v^u)^b mod p = (0 * v^u)^b mod p = 0`. The same holds for `A = n*p`, `n` being an integer, because `mod p` reduces it to zero again. That means that the server calculates the shared secret as `K = SHA-256(0)`. The verification endpoint then reduces to this:
+If `A` is zero, the entire secret becomes `S = (A * v^u)^b mod p = (0 * v^u)^b mod p = 0`. The same holds for `A = n*p`, `n` being an integer, because `mod p` reduces it to zero again. That means that the server calculates the HMAC key as `K = SHA-256(0)`. The verification endpoint then reduces to this:
 
 ```
 validate(session-id, M1):
@@ -194,6 +210,101 @@ Because the client has (by design) access to the salt, it can send the string `M
 This is a critical flaw, because it allows an attacker to impersonate an arbitrary registered client without knowing its password. The attacker can simply send the client's identifier and a zero public key for the exchange, and then login using a constant hash.
 
 # [Challenge 38](https://cryptopals.com/sets/5/challenges/38)
+
+This challenge has us implement an intentionally weakened version of the SRP protocol, and then shows that it's vulnerable to MITM attackers pretending to be a server. Specifically, they can obtain enough information to launch a dictionary attack against the hash and try to recover the client's password.
+
+The server protocol now looks like this (the changed line is highlighted):
+
+```
+register(identity, salt, v):
+  store (salt, v) in a lookup table under identity
+
+exchange(identity, A):
+  (salt, v) := credentials[identity]
+  b := Diffie-Hellman private key
+  B := g^b mod p                      // Was (k*v + g^b) mod p
+  u := SHA-256(A || B)
+  S := (A * v^u)^b mod p
+  K := SHA-256(S)
+  session-id := random value
+  store (identity, K, salt) in a lookup table under session-id
+  return session-id, salt, B
+
+validate(session-id, M1):
+  session := sessions[session-id]
+  expire sessions[session-id]
+  return HMAC-SHA-256(session.key, session.salt) == M1
+```
+
+The client performs the following calculations:
+
+```
+salt := random salt
+x := SHA-256(salt || password)
+v := g^x mod p
+credentials = (salt, v)
+
+
+server.register(identity, salt, v)
+
+... the client wants to log in now ...
+
+a := Diffie-Hellman private key
+A := g^a mod p (Diffie-Hellman public key based on a)
+session-id, salt, B := server.exchange(identity, A)
+
+u := SHA-256(A || B)
+x := SHA-256(salt || password)
+
+S := B^(a + u*x) mod p                // Was (B - k*g^x)^(a + u*x) mod p
+K := SHA-256(S)
+
+M1 := HMAC-SHA256(K, salt)
+server.validate(session-id, M1)
+```
+
+To check that this works, let's calculate the shared secret `S` on both sides.
+
+1. The client calculates
+
+```
+S = B^(a + u*x) = B^a * B^(u*x) = (g^b)^a * (g^b)^(u*x) = a^(a*b) * g^(b*u*x) mod p
+```
+
+2. The server calculates
+
+```
+S = (A * v^u)^b = A^b * (v^u)^b = (g^a)^b * v^(u*b) = g^(a*b) * (g^x)^(u*b) = g^(a*b) * g^(b*u*x) mod p
+```
+
+We see that both end up with the same value.
+
+Essentially, the server's public key `B` becomes simply the Diffie-Hellman public key corresponding to its private key `b`. That way, it loses any dependency on the client's password through `v`. This is the flaw that allows a MITM attacker to recalculate the client's hash `M1` from an arbitrary password, this being able to launch a dictionary attack. It works like this:
+
+The attacker deploys a fake server with an arbitrary (but fixed) private key `b`, its corresponding public key `B`, and a salt value `salt`. When the client calls the fake server's `exchange` endpoint, the server stores the client's public key `A`. Similarly, when the `validate` endpoint is called, the client's hash `M1` is stored.
+
+To test whether a candidate password `P` from the dictionary is the client's real password, the attacker has to recalculate the client's hash using this password. That's
+
+```
+M1' = HMAC-SHA256(K, salt)
+
+where K = SHA-256(S)
+      S = B^(a + u*x) mod p
+      u := SHA-256(A || B)
+      x := SHA-256(salt || P)
+```
+
+This seems like a dead end, because `S` depends on the client's private key `a` which the attacker doesn't have. However, because the protocol has been simplified, the Diffie-Hellman math kicks in, and we can calculate
+
+```
+S = B^(a + u*x) = B^a * B^(u*x) = (g^b)^a * B^(u*x) = (g^a)^b * B^(u*x) = A^b * B^(u*x) mod p
+```
+
+We can simply plug in the captured value of `A` into the formula and recover the shared secret. All the other quantities are known - `b` has been selected, `B` calculated from `b`, `u` calculated from `A` and `B`, and `x` calculated from the fixed salt and the candidate password `P`. The attacker can repeat this process, testing any password `P` from a dictionary.
+
+This calculation wouldn't be possible in the full SRP protocol. In that case, `S` is calculated as `S = (B - k*g^x)^(a + u*x) mod p` and the Diffie-Hellman mathematics that allowed the attacker to get rid of the client's secret `a` no longer applies.
+
+This challenge shows why it's important to mix in the client's password into the key exchange. Without it, the SRP protocol reduces to a more complex version of the Diffie-Hellman key exchange.
 
 # [Challenge 39](https://cryptopals.com/sets/5/challenges/39)
 
