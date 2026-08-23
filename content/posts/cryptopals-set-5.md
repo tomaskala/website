@@ -308,4 +308,81 @@ This challenge shows why it's important to mix in the client's password into the
 
 # [Challenge 39](https://cryptopals.com/sets/5/challenges/39)
 
+We now implement the famous RSA algorithm. Or rather, try to - although the algorithm is trivial to express mathematically, a robust implementation is incredibly tricky. Our naive version will work, but will be hopelessly broken for any real use. Still, it's useful to understand what's happening under the hood.
+
+## How does it work?
+
+To generate an RSA key, we do the following:
+
+1. Choose two large prime numbers `p` and `q`. These must be kept secret. In reality, this step isn't as easy as randomly generating two primes - careful measures must be taken to ensure they are sufficiently secure, not too close to each other, etc.
+2. Compute `N := p*q`. The value `N` is used as the modulus for all further calculation, or in other words, all computation is happening modulo `N`. The bit length of `N` is the key length.
+3. Compute `eta := (p-1)*(q-1)`. This is the product of `phi(p) = p-1` and `phi(q) = q-1`, the Euler totient functions of `p` and `q`. The totient function counts the numbers relatively coprime with its argument. Because we evaluate it for prime numbers only, it becomes one less than the number.
+4. Choose an integer `e` between 1 and `eta` coprime with `eta`. In practice, a constant value is used here, often `e := 2^16 + 1 = 65537`. We use `e := 3` here.
+5. Determine `d` as the multiplicative inverse of `e` modulo `eta`. This can be calculated by solving the equation `d*e = 1 mod eta` using the extended Euclidean algorithm.
+6. The public key consists of `(e, n)` while the private key consists of `(d, n)`.
+
+To encrypt a message `m < min(p, q)` represented as a number using the public key `(e, n)`, we calculate
+
+```
+c := m^e mod n
+```
+
+To decrypt a message `c` represented as a number using the private key `(d, n)`, we calculate
+
+```
+m := c^d mod n
+```
+
+## Why does this work?
+
+A sketch is below, though this is by no means a formal proof.
+
+We will need two theorems which I will just state here, and one small lemma which I will prove. The RSA functionality then follows.
+
+### [Fermat's little theorem](https://en.wikipedia.org/wiki/Fermat%27s_little_theorem)
+
+Let `p` be a prime number. If an integer `a` is coprime with `p`, then `a^(p-1) = 1 mod p`.
+
+### [Bézout's identity](https://en.wikipedia.org/wiki/B%C3%A9zout%27s_identity)
+
+Let `a` and `b` be integers. Then there exist integers `A` and `B` such that `gcd(a,b) = A*a + B*b`.
+
+### Euclid's lemma
+
+Let `a`, `b` and `c` be integers such that `a` divides `c`, `b` divides `c` and `gcd(a,b) = 1`. Then `a*b` divides `c`.
+
+_Proof:_
+
+Because `a` divides `c`, there exists an integer `k` such that `c = k*a`. Similarly, `b` divides `c`, so there exists an integer `l` such that `c = l*b`.
+
+Next we apply Bézout's identity to get `1 = gcd(a,b) = A*a + B*b` for some integers `A` and `B`.
+
+Multiplying both sides by `c`, we get `c = c*A*a + c*B*b`. Substituting our assumptions about divisibility, we obtain `c = l*b*A*a + k*a*B*b = a*b*(l*A + k*B)`, or in other words, `a*b` divides `c`.
+
+### RSA proof sketch
+
+We set `d` to be a multiplicative inverse of `e` mod `eta = (p-1)*(q-1)`, so `d*e = 1 mod (p-1)*(q-1)`. Another way to state this is `d*e = 1 + k*(p-1)*(q-1)` for any integer `k`. We use this to calculate
+
+```
+(m^e)^d = m^(e*d) = m^(1 + k*(p-1)*(q-1)) = m * (m^(p-1))^(k*(q-1))
+```
+
+Because `p` is a prime and `m < p`, `m` is coprime with `p`. That means we can apply Fermat's little theorem to get
+
+```
+m * (m^(p-1))^(k*(q-1)) = m * 1^(k*(q-1)) = m mod p
+```
+
+Because the number `q` has the same properties as `q`, we also get `(m^e)^d = m mod q`.
+
+Now we need to combine the results `(m^e)^d = m mod p` and `(m^e)^d = m mod q` into `(m^e)^d = m mod n`.
+
+Another way to restate the results is to say that `p` divides `(m - (m^e)^d)` and also `q` divides `(m - (m^e)^d)`. Because `p` and `q` are coprime, we can apply Euclid's lemma to obtain `n = p*q` divides `(m - (m^e)^d)`, or equivalently, `(m^e)^d = m mod n`.
+
+## Why is this safe?
+
+To decrypt a message, an attacker has to calculate the private key `d`, for which they need `(p-1)*(q-1)`. This can be calculated from the public key `(e, n)` only by factoring `n` into `p*q`. No known polynomial algorithm exists, although it is possible to break smaller key sizes. Famously, RSA is also [not quantum-resistant](https://en.wikipedia.org/wiki/Shor's_algorithm).
+
+Nowadays, public key algorithms based on elliptic curves are preferred due to their smaller key sizes providing a comparative security level, although they are also not quantum-resistant.
+
 # [Challenge 40](https://cryptopals.com/sets/5/challenges/40)
