@@ -1,10 +1,9 @@
 ---
 title: "Cryptopals - Set 5"
-date: 2026-08-09T21:31:54+02:00
-draft: true
+date: 2026-08-24T16:40:54+02:00
 ---
 
-The fourth set of the [cryptopals](https://cryptopals.com/) challenges is different from the previous. It starts by exploring the famous Diffie-Hellman key exchange, followed by playing with the Secure Remote Password (SRP) protocol, and ends with some RSA.
+The fifth set of the [cryptopals](https://cryptopals.com/) challenges is different from the previous, because we now switch from symmetric to asymmetric cryptography. We start by exploring the Diffie-Hellman key exchange and a closely related protocol, Secure Remote Password. Towards the end we implement and explore RSA; this is a bridge to the following set where we will see RSA much more.
 
 As always, my solutions can be found on [GitHub](https://github.com/tomaskala/cryptopals).
 
@@ -12,23 +11,23 @@ As always, my solutions can be found on [GitHub](https://github.com/tomaskala/cr
 
 - Diffie-Hellman is very simple to express, given how important it is ([Challenge 33](#challenge-33httpscryptopalscomsets5challenges33)).
 - Anonymous Diffie-Hellman (without any authentication of the two sides) is susceptible to MITM attacks. The MITM can hijack the connection, decrypt and re-transmit messages, or even inject custom parameters ([Challenge 34](#challenge-34httpscryptopalscomsets5challenges34), [Challenge 35](#challenge-35httpscryptopalscomsets5challenges35)). Particular values can make the shared secret trivially guessable ([Challenge 35](#challenge-35httpscryptopalscomsets5challenges35)).
-- Although based on Diffie-Hellman, the SRP (Secure Remote Password) protocol is quite complicated ([Challenge 36](#challenge-36httpscryptopalscomsets5challenges36)). Its purpose is to have a client and a server agree on a shared secret in such a way that the client proves that it knows a password without revealing it to the server.
-- A naively implemented SRP protocol has a fatal flaw ([Challenge 37](#challenge-37httpscryptopalscomsets5challenges37)). It allows an attacker to impersonate an arbitrary client without knowing their password.
-- If the SRP protocol didn't mix in the client's password into the server public key, it would reduce to a complicated version of the Diffie-Hellman key exchange and allow an attacker to impersonate the server and run a dictionary attack agains the client's password ([Challenge 38](#challenge-38httpscryptopalscomsets5challenges38)).
+- Although based on Diffie-Hellman, the SRP (Secure Remote Password) protocol is quite complicated ([Challenge 36](#challenge-36httpscryptopalscomsets5challenges36)). Its purpose is to have a client and a server agree on a shared secret after the client proves that it knows a password, without revealing it to the server.
+- A naively implemented SRP protocol has a fatal flaw ([Challenge 37](#challenge-37httpscryptopalscomsets5challenges37)). It allows an attacker to impersonate an arbitrary client without knowing their password by sending a zero public key.
+- If the SRP protocol didn't mix in the client's password into the server public key, it would reduce to a complicated version of the Diffie-Hellman key exchange and allow an attacker to impersonate the server and run an offline dictionary attack against the client's password ([Challenge 38](#challenge-38httpscryptopalscomsets5challenges38)).
 - RSA is also quite simple to express given its importance, although the math is more involved ([Challenge 39](#challenge-39httpscryptopalscomsets5challenges39)). Correctly implementing it is however very difficult.
-- Textbook RSA is incredibly broken and a proper padding must always be used. If a message is encrypted as it is, it leaks information. When the public exponent is small enough, the attacker can gather enough information to decrypt the message. ([Challenge 40](#challenge-40httpscryptopalscomsets5challenges40)).
+- Textbook RSA without padding must never be used. If a message is encrypted as it is, it leaks information to the attacker. When the public exponent is small enough, the attacker can gather enough information to decrypt the message. ([Challenge 40](#challenge-40httpscryptopalscomsets5challenges40)).
 
 # [Challenge 33](https://cryptopals.com/sets/5/challenges/33)
 
-We begin by implementing the simplest form of the Diffie-Hellman key exchange algorithm, the anonymous Diffie-Hellman. In this scenario, the two sides (Alice and Bob) have no mechanism to authenticate to each other. All they do is exchange parameters in public to derive a shared secret. This form is susceptible to MITM attacks where a third entity (Eve) can capture and edit traffic between Alice and Bob, and derive its own shared secret with each. Eve can then read and relay all traffic between Alice and Bob.
+We begin by implementing the simplest form of the Diffie-Hellman key exchange algorithm, the anonymous Diffie-Hellman. In this scenario, the two sides (Alice and Bob) have no mechanism to authenticate each other. All they do is exchange parameters in public to derive a shared secret. This form is susceptible to MITM attacks where a third entity (Eve) can capture and edit traffic between Alice and Bob, and derive its own shared secret with each. Eve can then read and relay all traffic between Alice and Bob. We will see the MITM attack in the following two exercises; for now, let's just implement the key exchange.
 
 Considering how important Diffie-Hellman is, the algorithm is really simple:
 
 1. Agree on two parameters: `p` (a large prime number) and `g` (a generator of the multiplicative group `Z_p^*`).
 2. Alice generates a random number `a mod p`. This is Alice's private key.
 3. Bob generates a random number `b mod p`. This is Bob's private key.
-4. Alice sends the public key `A = g^a mod p` to Bob.
-5. Bob sends the public key `B = g^b mod p` to Alice.
+4. Alice sends the public key `A := g^a mod p` to Bob.
+5. Bob sends the public key `B := g^b mod p` to Alice.
 6. Alice computes the shared secret `s = B^a = (g^b)^a = g^(a*b) mod p`.
 7. Bob computes the shared secret `s = A^b = (g^a)^b = g^(a*b) mod p`.
 
@@ -36,7 +35,7 @@ At this point, both sides have a shared secret computed using each other's priva
 
 # [Challenge 34](https://cryptopals.com/sets/5/challenges/34)
 
-Because the Diffie-Hellman protocol we implemented in challenge 33 is anonymous, it is susceptible to MITM attacks. Neither of the two parties (Alice and Bob) can prove that they are talking to who they think, so Eve can hijack their connection. In this challenge, we implement a particular MITM attack.
+Because the Diffie-Hellman protocol we implemented in challenge 33 is anonymous, it is susceptible to MITM attacks. Neither of the two parties (Alice and Bob) can prove that they are talking to who they think, so Eve can hijack their connection. In this challenge, we implement a particular MITM scenario.
 
 The standard MITM attack against anonymous DH key exchange works as follows:
 
@@ -52,7 +51,7 @@ After the hijacked key exchange finishes, the situation is as follows:
 3. Eve has `e_a` (her private key for Alice) and `s_a = A^e_a = (g^a)^e_a = g^(a*e_a) mod p` (what Alice thinks is the shared secret).
 4. Eve has `e_b` (her private key for Bob) and `s_b = B^e_b = (g^b)^e_b = g^(b*e_b) mod p` (what Bob thinks is the shared secret).
 
-Notice that due to the hijacking, Alice and Bob can no longer communicate, because they each have a different secret. Eve must act as a mediator, decrypting every message from Alice using `s_a`, presumably storing it, and reencrypting it for Bob using `s_b` (and similarly the other way around). The full protocol implemented in the challenge follows the key exchange by using SHA-1 to calculate an AES key from the shared secret and sending an AES-CBC encrypted message between Alice and Bob.
+Notice that due to the hijacking, Alice and Bob can no longer communicate, because they each have a different secret. Eve must act as a mediator, decrypting every message from Alice using `s_a`, presumably storing it, and reencrypting it for Bob using `s_b` (and similarly the other way around). The full protocol implemented in the challenge follows the key exchange by using SHA-1 to derive an AES key from the shared secret and sending an AES-CBC encrypted message between Alice and Bob.
 
 The MITM attack we implement here is slightly different and actually has Eve inject a different parameter instead of generating different keys for Alice and for Bob. That's only a technicality, because we will be playing with parameter injection some more in the next exercise, so it's good to prepare for it. What the protocol looks like is this:
 
@@ -88,7 +87,7 @@ g^1 = (p-1)^1 = p-1 mod p
 Clearly, taking the remainder after dividing `p-1` with `p` is again `p-1`. Let's now try with an exponent of 2:
 
 ```
-g^2 = (p-1)^2 = (p-1)*(p-1) = p^2 - 2p + 1 = p*p - 2p + 1 = 0*0 - 2*0 + 1 = 1 mod p
+g^2 = (p-1)^2 = (p-1)*(p-1) = p*p - 2p + 1 = 0*0 - 2*0 + 1 = 1 mod p
 ```
 
 This generalizes for arbitrary odd or even powers:
@@ -285,7 +284,7 @@ S = (A * v^u)^b = A^b * (v^u)^b = (g^a)^b * v^(u*b) = g^(a*b) * (g^x)^(u*b) = g^
 
 We see that both end up with the same value.
 
-Essentially, the server's public key `B` becomes simply the Diffie-Hellman public key corresponding to its private key `b`. That way, it loses any dependency on the client's password through `v`. This is the flaw that allows a MITM attacker to recalculate the client's hash `M1` from an arbitrary password, this being able to launch a dictionary attack. It works like this:
+Essentially, the server's public key `B` becomes simply the Diffie-Hellman public key corresponding to its private key `b`. That way, it loses any dependency on the client's password through `v`. This is the flaw that allows a MITM attacker to recalculate the client's hash `M1` from an arbitrary password, thus being able to launch a dictionary attack. It works like this:
 
 The attacker deploys a fake server with an arbitrary (but fixed) private key `b`, its corresponding public key `B`, and a salt value `salt`. When the client calls the fake server's `exchange` endpoint, the server stores the client's public key `A`. Similarly, when the `validate` endpoint is called, the client's hash `M1` is stored.
 
@@ -320,14 +319,14 @@ We now implement the famous RSA algorithm. Or rather, try to - although the algo
 
 To generate an RSA key, we do the following:
 
-1. Choose two large prime numbers `p` and `q`. These must be kept secret. In reality, this step isn't as easy as randomly generating two primes - careful measures must be taken to ensure they are sufficiently secure, not too close to each other, etc.
-2. Compute `N := p*q`. The value `N` is used as the modulus for all further calculation, or in other words, all computation is happening modulo `N`. The bit length of `N` is the key length.
-3. Compute `eta := (p-1)*(q-1)`. This is the product of `phi(p) = p-1` and `phi(q) = q-1`, the Euler totient functions of `p` and `q`. The totient function counts the numbers relatively coprime with its argument. Because we evaluate it for prime numbers only, it becomes one less than the number.
-4. Choose an integer `e` between 1 and `eta` coprime with `eta`. In practice, a constant value is used here, often `e := 2^16 + 1 = 65537`. We use `e := 3` here.
+1. Choose two large prime numbers `p` and `q`. These must be kept secret. In reality, this step isn't as easy as randomly generating two primes - careful measures must be taken to ensure they are sufficiently large, not too close to each other, etc.
+2. Compute `N := p*q`. The value `N` is used as the modulus for all further calculations, or in other words, all computations are happening modulo `N`. The bit length of `N` is the key length.
+3. Compute `eta := (p-1)*(q-1)`. This is the product of `phi(p) = p-1` and `phi(q) = q-1`, the Euler totient functions of `p` and `q`. The totient function counts the numbers smaller than its argument that are coprime to it. Because we evaluate it for prime numbers only, it becomes one less than the number.
+4. Choose an integer `e` between 1 and `eta` coprime with `eta`. In practice, a constant value is used here, often `e := 2^16 + 1 = 65537`. We use `e := 3` here; this will enable some attacks later.
 5. Determine `d` as the multiplicative inverse of `e` modulo `eta`. This can be calculated by solving the equation `d*e = 1 mod eta` using the extended Euclidean algorithm.
 6. The public key consists of `(e, n)` while the private key consists of `(d, n)`.
 
-To encrypt a message `m < min(p, q)` represented as a number using the public key `(e, n)`, we calculate
+To encrypt a message `m < n` represented as a number using the public key `(e, n)`, we calculate
 
 ```
 c := m^e mod n
@@ -343,7 +342,7 @@ m := c^d mod n
 
 A sketch is below, though this is by no means a formal proof.
 
-We will need two theorems which I will just state here, and one small lemma which I will prove. The RSA functionality then follows.
+We will need two theorems which I will just state here, and one small lemma which I will prove. The RSA functionality then follows from those.
 
 ### [Fermat's little theorem](https://en.wikipedia.org/wiki/Fermat%27s_little_theorem)
 
@@ -373,10 +372,16 @@ We set `d` to be a multiplicative inverse of `e` mod `eta = (p-1)*(q-1)`, so `d*
 (m^e)^d = m^(e*d) = m^(1 + k*(p-1)*(q-1)) = m * (m^(p-1))^(k*(q-1))
 ```
 
-Because `p` is a prime and `m < p`, `m` is coprime with `p`. That means we can apply Fermat's little theorem to get
+We know that `m < n = p*q`. Suppose that `m` is coprime to `p`. That means we can apply Fermat's little theorem to get
 
 ```
 m * (m^(p-1))^(k*(q-1)) = m * 1^(k*(q-1)) = m mod p
+```
+
+If on the other hand `m` was not coprime to `p` (i.e., was a multiple of `p` and therefore `m = 0 mod p`), we would have
+
+```
+m * (m^(p-1))^(k*(q-1)) = 0 * (0^(p-1))^(k*(q-1)) = 0 = m mod p
 ```
 
 Because the number `q` has the same properties as `q`, we also get `(m^e)^d = m mod q`.
@@ -385,7 +390,7 @@ Now we need to combine the results `(m^e)^d = m mod p` and `(m^e)^d = m mod q` i
 
 Another way to restate the results is to say that `p` divides `(m - (m^e)^d)` and also `q` divides `(m - (m^e)^d)`. Because `p` and `q` are coprime, we can apply Euclid's lemma to obtain `n = p*q` divides `(m - (m^e)^d)`, or equivalently, `(m^e)^d = m mod n`.
 
-## Why is this safe?
+## Is this safe?
 
 To decrypt a message, an attacker has to calculate the private key `d`, for which they need `(p-1)*(q-1)`. This can be calculated from the public key `(e, n)` only by factoring `n` into `p*q`. No known polynomial algorithm exists, although it is possible to break smaller key sizes. Famously, RSA is also [not quantum-resistant](https://en.wikipedia.org/wiki/Shor's_algorithm).
 
@@ -393,7 +398,7 @@ Nowadays, public key algorithms based on elliptic curves are preferred due to th
 
 # [Challenge 40](https://cryptopals.com/sets/5/challenges/40)
 
-We implement Håstad's broadcast attack against a naive RSA implementation with a small public exponent (E=3 as implemented in the previous challenge). Why naive? Because directly exponentiating a message converted to a number works only on paper, this is the so-called textbook RSA. In reality, a [padding scheme](https://en.wikipedia.org/wiki/Optimal_asymmetric_encryption_padding) must be used to introduce randomness into the otherwise deterministic RSA encryption and make it resistant against chosen plaintext attacks. This [StackOverflow answer](https://crypto.stackexchange.com/questions/52504/deciphering-the-rsa-encrypted-message-from-three-different-public-keys) nicely summarizes what's wrong with textbook RSA.
+We implement Håstad's broadcast attack against a naive RSA implementation with a small public exponent (E=3 from the previous challenge). Why naive? Because directly exponentiating a message converted to a number works only on paper, this is the so-called textbook RSA. In reality, a [padding scheme](https://en.wikipedia.org/wiki/Optimal_asymmetric_encryption_padding) must be used to introduce randomness into the otherwise deterministic RSA encryption and to make it resistant against chosen plaintext attacks. This [StackOverflow answer](https://crypto.stackexchange.com/questions/52504/deciphering-the-rsa-encrypted-message-from-three-different-public-keys) nicely summarizes what's wrong with textbook RSA.
 
 ## Background
 
@@ -419,11 +424,11 @@ This is nicely summarized in [Ben Lynn's number theory course](https://crypto.st
 
 ## The attack
 
-Suppose the attacker can coerce a naive RSA implementation with E=3 into encrypting the same plaintext `m` 3 times, each to a different public key. This gives the attacker
+Suppose the attacker can coerce a naive RSA implementation with E=3 into encrypting the same plaintext `m` 3 times, each to a different public key. This gives them
 
-1. `c_0`: encryption of `m` against a public key `(3, n_0)`
-2. `c_1`: encryption of `m` against a public key `(3, n_1)`
-3. `c_2`: encryption of `m` against a public key `(3, n_2)`
+1. `c_0`: encryption of `m` against the public key `(3, n_0)`
+2. `c_1`: encryption of `m` against the public key `(3, n_1)`
+3. `c_2`: encryption of `m` against the public key `(3, n_2)`
 
 Due to how RSA works, this presents the attacker the following system of equations:
 
@@ -436,7 +441,11 @@ c_2 = m^3 mod n_2
 Assuming that `n_0`, `n_1` and `n_2` are pairwise coprime (which they should be with a very high probability - otherwise, they would share a prime factor), the attacker can use the CRT to calculate
 
 ```
-m^3 =  c_0 * N_0 * m_0 + c_1 * N_1 * m_1 + c_2 * N_2 * m_2
+m^3 =  c_0 * N_0 * m_0 + c_1 * N_1 * m_1 + c_2 * N_2 * m_2 mod N
 ```
 
-By calculating the integer cube root, they can recover the plaintext message `m`.
+Here `N` is again `n_0 * n_1 * n_2`.
+
+By calculating the integer cube root of `m^3`, they can recover the plaintext message `m`.
+
+This attack demonstrates why it's necessary to use a padding whenever RSA is used. RSA padding introduces randomness, so that every encryption produces a different ciphertext even when the same plaintext is encrypted. In this scenario, each equation would get a different `m^3` and the attack would fail.
