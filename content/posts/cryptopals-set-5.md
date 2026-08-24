@@ -386,3 +386,51 @@ To decrypt a message, an attacker has to calculate the private key `d`, for whic
 Nowadays, public key algorithms based on elliptic curves are preferred due to their smaller key sizes providing a comparative security level, although they are also not quantum-resistant.
 
 # [Challenge 40](https://cryptopals.com/sets/5/challenges/40)
+
+We implement Håstad's broadcast attack against a naive RSA implementation with a small public exponent (E=3 as implemented in the previous challenge). Why naive? Because directly exponentiating a message converted to a number works only on paper, this is the so-called textbook RSA. In reality, a [padding scheme](https://en.wikipedia.org/wiki/Optimal_asymmetric_encryption_padding) must be used to introduce randomness into the otherwise deterministic RSA encryption and make it resistant against chosen plaintext attacks. This [StackOverflow answer](https://crypto.stackexchange.com/questions/52504/deciphering-the-rsa-encrypted-message-from-three-different-public-keys) nicely summarizes what's wrong with textbook RSA.
+
+## Background
+
+To perform the attack, we will need the Chinese Remainder Theorem (CRT). Suppose we have `n_1, ..., n_k` pairwise coprime integers greater than 1. The CRT states that for any integers `a_1, ..., a_k`, the system of equations
+
+```
+x = a_1 mod n_1
+  ...
+x = a_k mod n_k
+```
+
+has a solution of the following form
+
+```
+x = sum_{i=1}^k a_i * N_i * m_i mod N
+
+where N = n_1 * ... * n_k
+      N_i = N / n_i
+      m_i is the multiplicative inverse of N_i mod n_i
+```
+
+This is nicely summarized in [Ben Lynn's number theory course](https://crypto.stanford.edu/pbc/notes/numbertheory/crt.html).
+
+## The attack
+
+Suppose the attacker can coerce a naive RSA implementation with E=3 into encrypting the same plaintext `m` 3 times, each to a different public key. This gives the attacker
+
+1. `c_0`: encryption of `m` against a public key `(3, n_0)`
+2. `c_1`: encryption of `m` against a public key `(3, n_1)`
+3. `c_2`: encryption of `m` against a public key `(3, n_2)`
+
+Due to how RSA works, this presents the attacker the following system of equations:
+
+```
+c_0 = m^3 mod n_0
+c_1 = m^3 mod n_1
+c_2 = m^3 mod n_2
+```
+
+Assuming that `n_0`, `n_1` and `n_2` are pairwise coprime (which they should be with a very high probability - otherwise, they would share a prime factor), the attacker can use the CRT to calculate
+
+```
+m^3 =  c_0 * N_0 * m_0 + c_1 * N_1 * m_1 + c_2 * N_2 * m_2
+```
+
+By calculating the integer cube root, they can recover the plaintext message `m`.
