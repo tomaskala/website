@@ -10,7 +10,13 @@ As always, my solutions can be found on [GitHub](https://github.com/tomaskala/cr
 
 # Lessons learned
 
-TODO
+- Diffie-Hellman is very simple to express, given how important it is ([Challenge 33](#challenge-33httpscryptopalscomsets5challenges33)).
+- Anonymous Diffie-Hellman (without any authentication of the two sides) is susceptible to MITM attacks. The MITM can hijack the connection, decrypt and re-transmit messages, or even inject custom parameters ([Challenge 34](#challenge-34httpscryptopalscomsets5challenges34), [Challenge 35](#challenge-35httpscryptopalscomsets5challenges35)). Particular values can make the shared secret trivially guessable ([Challenge 35](#challenge-35httpscryptopalscomsets5challenges35)).
+- Although based on Diffie-Hellman, the SRP (Secure Remote Password) protocol is quite complicated ([Challenge 36](#challenge-36httpscryptopalscomsets5challenges36)). Its purpose is to have a client and a server agree on a shared secret in such a way that the client proves that it knows a password without revealing it to the server.
+- A naively implemented SRP protocol has a fatal flaw ([Challenge 37](#challenge-37httpscryptopalscomsets5challenges37)). It allows an attacker to impersonate an arbitrary client without knowing their password.
+- If the SRP protocol didn't mix in the client's password into the server public key, it would reduce to a complicated version of the Diffie-Hellman key exchange and allow an attacker to impersonate the server and run a dictionary attack agains the client's password ([Challenge 38](#challenge-38httpscryptopalscomsets5challenges38)).
+- RSA is also quite simple to express given its importance, although the math is more involved ([Challenge 39](#challenge-39httpscryptopalscomsets5challenges39)). Correctly implementing it is however very difficult.
+- Textbook RSA is incredibly broken and a proper padding must always be used. If a message is encrypted as it is, it leaks information. When the public exponent is small enough, the attacker can gather enough information to decrypt the message. ([Challenge 40](#challenge-40httpscryptopalscomsets5challenges40)).
 
 # [Challenge 33](https://cryptopals.com/sets/5/challenges/33)
 
