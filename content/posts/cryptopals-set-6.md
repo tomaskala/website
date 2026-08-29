@@ -11,6 +11,7 @@ As always, my solutions can be found on [GitHub](https://github.com/tomaskala/cr
 # Lessons learned
 
 - Never use RSA without padding. The attacker can manipulate the ciphertext in a way that affects the underlying plaintext ([Challenge 41](#challenge-41httpscryptopalscomsets6challenges41)).
+- Padding isn't there just for fun, it needs to be thoroughly checked to make sure it's exactly according to the specification. Also don't use small exponents just to speed up the computations, and while you're at it, don't use obsolete padding schemes ([Challenge 42](#challenge-42httpscryptopalscomsets6challenges42)).
 
 # [Challenge 41](https://cryptopals.com/sets/6/challenges/41)
 
@@ -49,6 +50,52 @@ P = S^(-1) * P' mod N = S^(-1) * S * P mod N
 where `S^(-1)` is the multiplicative inverse of `S` modulo `N`.
 
 # [Challenge 42](https://cryptopals.com/sets/6/challenges/42)
+
+The focus of this challenge is a famous attack on the RSA signature algorithm under certain conditions, discovered by Daniel Bleichenbacher. Until now, we were working with RSA encryption - the secret message is encrypted using the public key and decrypted using the private key. With signature, it's the other way around - the publisher of the message signs it with their private key, and anyone who wants to verify the signature does so using the public key.
+
+In reality, we don't encrypt or sign the entire messages, because RSA limits the message length to be at most as long as the key size. Instead, we encrypt either a symmetric key (when encrypting) or sign the message's hash (when signing). Moreover, we don't just plug in the key or the hash into the RSA formulas (this would be the textbook RSA shown to have all kinds of issues). Instead, the message is padded so that it cannot be directly affected by operations on the ciphertext.
+
+Bleichenbacher's attack is valid in a particular scenario where the padding algorithm is PKCS#1 v1.5, the signature checking function doesn't check the padding properly, and the key's public exponent is 3, a value commonly used in the past. Let's investigate what that means.
+
+When the public exponent is 3, the RSA encryption (or, in this case, signature verification) reduces to a simple cubing:
+
+```
+c := m^E mod N = m^3 mod N
+```
+
+When the message is sufficiently small, cubing it won't exceed the modulus N, meaning that the modulo operation is not applied and the key isn't used at all. Nowadays the most common value of E is 2^16 + 1 = 65537, but historically E=3 was often used to speed up the computation. It isn't unsafe by itself, but when it meets the other bugs described below, it opens an attack vector.
+
+The PKCS#1 v1.5 padding algorithm (no longer recommended, but still sometimes implemented for backwards compatibility) looks like this:
+
+```
+padded-message := 0x00 0x01 0xff ... 0xff 0x00 ASN.1 HASH
+```
+
+Where
+
+- `ASN.1` contains information about what hash function was used encoded in the [ASN.1](https://en.wikipedia.org/wiki/ASN.1) format.
+- `HASH` contains the digest of the message being signed calculated according to an algorithm described in the `ASN.1` part.
+- The padding `0xff ... 0xff` contains enough bytes to make `padded-message` as long as the modulus `N`.
+
+Some signature verification implementations do not check the padding properly. In particular, they don't make sure that the `HASH` part is right-aligned, i.e., that no further bytes follow after it (or equivalently, that there is the correct number of the `0xff` bytes). What they permit is the following
+
+```
+invalid-padded-message := 0x00 0x01 0xff ... 0xff 0x00 ASN.1 HASH GARBAGE
+```
+
+Arbitrary bytes can follow the `HASH` part and the verification function doesn't check them. It turns out that we can utilize them to forge a signature for an arbitrary message without knowing the private key; as long as the public exponent is `E = 3`. Let's see how.
+
+The attacker wishes to forge a signature for a message `m` using a particular hash algorithm (I went for SHA-1 - although it's now known to be broken, it was widely used when the attack was published). They prepare a buffer as long as the modulus `N` (the correct size). They will then fill it like this:
+
+```
+buffer := 0x00 0x01 PADDING 0x00 ASN.1 HASH EMPTY
+```
+
+Depending on what the verification algorithm checks for, the `PADDING` part can be left out entirely, filled with a single `0xff` byte, or filled with eight `0xff` bytes. The `ASN.1` part encodes the hash function used as usual in the PKCS#1 v1.5 padding, and `HASH = SHA-1(m)` in my case. The `EMPTY` part can contain anything as long as the entire buffer is as long as `N`.
+
+Now the attacker converts the buffer into a big integer. This causes the `0x00 0x01 PADDING 0x00 ASN.1 HASH` parts to appear in the higher-order digits, and the `EMPTY` part in the lower-order digits. They then calculate the integer cube root of this number rounded up, and convert the result back into a byte buffer. The cube root must be rounded up to ensure that when cubed again, the top bytes contain the forged values. When the verifier encrypts the message (which for `E = 3` means cubing it), the initial bytes of the resulting buffer will contain the values provided by the attacker. The `GARBAGE` part will contain a total mess, because our message was very likely not a perfect cube, so calculating a cube root did not result in an exact value. Because the verifier doesn't check whether `HASH` is right-justified (as it should), they won't notice though.
+
+This only works if there's enough space in the buffer, that is, for large enough keys. My attack with SHA-1 broke when I tried it on a 1024-bit key, because there wasn't enough space. It works for a key size of 2048 bits an higher though. Notice that the attacker didn't even need the public key, just knowing the key size is enough. The attack becomes impractical for larger values of `E` than 3, because the larger the exponent, the more `GARBAGE` space is needed to contain the rounding error. That much space would require key sizes far larger than what's used in practice.
 
 # [Challenge 43](https://cryptopals.com/sets/6/challenges/43)
 
