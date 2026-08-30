@@ -12,6 +12,7 @@ As always, my solutions can be found on [GitHub](https://github.com/tomaskala/cr
 
 - Never use RSA without padding. The attacker can manipulate the ciphertext in a way that affects the underlying plaintext ([Challenge 41](#challenge-41httpscryptopalscomsets6challenges41)).
 - Padding isn't there just for fun, it needs to be thoroughly checked to make sure it's exactly according to the specification. Also don't use small exponents just to speed up the computations, and while you're at it, don't use obsolete padding schemes ([Challenge 42](#challenge-42httpscryptopalscomsets6challenges42)).
+- Be careful about the ranges used to calculate cryptographical parameters. Small values make it easy to enumerate all possibilities and reverse calculations, leaking secret values ([Challenge 43](#challenge-43httpscryptopalscomsets6challenges43)).
 
 # [Challenge 41](https://cryptopals.com/sets/6/challenges/41)
 
@@ -98,6 +99,56 @@ Now the attacker converts the buffer into a big integer. This causes the `0x00 0
 This only works if there's enough space in the buffer, that is, for large enough keys. My attack with SHA-1 broke when I tried it on a 1024-bit key, because there wasn't enough space. It works for a key size of 2048 bits an higher though. Notice that the attacker didn't even need the public key, just knowing the key size is enough. The attack becomes impractical for larger values of `E` than 3, because the larger the exponent, the more `GARBAGE` space is needed to contain the rounding error. That much space would require key sizes far larger than what's used in practice.
 
 # [Challenge 43](https://cryptopals.com/sets/6/challenges/43)
+
+This and the two following challenges center around DSA - Digital Signature Algorithm. Nowadays the algorithm has been deprecated and more modern alternatives based on elliptic curves are preferred. DSA itself isn't broken, but the most commonly used key size of 1024 bits is weak now, and larger sizes aren't widely supported.
+
+DSA uses three parameters called `p` (a large prime number), `q` (a somewhat smaller prime number) and `g`. Their generation is somewhat involved, so the challenge is nice enough to give us pre-computed values. It involves three operations, denoting the private key by `x`, public key by `y`, a message to be signed by `m` and a hash function by `H` (typically SHA-1 - DSA is old):
+
+```
+generate-keys(p, q, g):
+  x := random choice from [1, ..., q-1]
+  y := g^x mod p
+  return (x, y)
+
+sign(p, q, g, x, m):
+  k := random choice from [1, ..., q-1]
+  r := (g^k mod p) mod q
+
+  if r == 0:
+    repeat with a different k
+
+  s := (k^(-1) * (H(m) + x*r)) mod q
+
+  if s == 0:
+    repeat with a different k
+
+  return (r, s)
+
+verify(p, q, g, y, r, s, m):
+  verify 0 < r < q and 0 < s < q
+  w := s^(-1) mod q
+  u1 := H(m) * w mod q
+  u2 := r*w mod q
+  v := (g^u1 * y^u2 mod p) mod q
+  return v = r
+```
+
+Note the number `k` generated in the signing operation. This value is a nonce generated per message, and must never be repeated. That's for the next task though; for now, we focus on something else.
+
+Notice the calculation of `s` in the signing operation can be reversed, allowing an attacker to calculate the private key `x` from a known `k`:
+
+```
+x = (r^(-1) * (s*k - H(m))) mod q
+```
+
+In this task, we are given a known message `m`, its signature `(r, s)` and a public key `y` to verify the signature. However, the signing operation contained a bug and only generated `k` as a random choice from `[1, ..., 2^16]`. Our goal is to calculate the private key `x`.
+
+There are two ways to calculate a candidate for each possible `k` in the range:
+
+1. A slower method that calculates a possible private key `x` based on the reversed equation above. From that, a public key is calculated as `g^x mod p` and compared with the known public key `y`.
+2. A faster method that calculates a possible `r` from the currently enumerated `k` and once it matches the known one, use that `k` to calculate the private key `x`. This can be calculated iteratively by repeatedly multiplying `g` by itself and applying the modulo operations.
+
+Regardless of which method we use, we can quickly crack the private key when the nonce is known to be small.
 
 # [Challenge 44](https://cryptopals.com/sets/6/challenges/44)
 
