@@ -13,6 +13,7 @@ As always, my solutions can be found on [GitHub](https://github.com/tomaskala/cr
 - Never use RSA without padding. The attacker can manipulate the ciphertext in a way that affects the underlying plaintext ([Challenge 41](#challenge-41httpscryptopalscomsets6challenges41)).
 - Padding isn't there just for fun, it needs to be thoroughly checked to make sure it's exactly according to the specification. Also don't use small exponents just to speed up the computations, and while you're at it, don't use obsolete padding schemes ([Challenge 42](#challenge-42httpscryptopalscomsets6challenges42)).
 - Be careful about the ranges used to calculate cryptographical parameters. Small values make it easy to enumerate all possibilities and reverse calculations, leaking secret values ([Challenge 43](#challenge-43httpscryptopalscomsets6challenges43)).
+- Once again, never reuse nonces. In DSA, a reused nonce allows recovering the private key from a pair of signatures (([Challenge 44](#challenge-44httpscryptopalscomsets6challenges44))).
 
 # [Challenge 41](https://cryptopals.com/sets/6/challenges/41)
 
@@ -151,6 +152,32 @@ There are two ways to calculate a candidate for each possible `k` in the range:
 Regardless of which method we use, we can quickly crack the private key when the nonce is known to be small.
 
 # [Challenge 44](https://cryptopals.com/sets/6/challenges/44)
+
+Another in the series of challenges showing why reusing a nonce breaks cryptography. In DSA, the value `k` must be generated unique per message; otherwise, anyone can recompute the private key `x` from a message `m` and its signature `(r, s)`.
+
+From the signing operation, the `s` part of the signature is calculated as
+
+```
+s = (k^(-1) * (H(m) + x*r)) mod q
+```
+
+By its construction, the parameter `r` is the same when calculated using the same nonce `k`, which can serve as an indicator that the nonce was repeated. If we plug in `m1`, `m2`, `s1` and `s2` into the equation for `s` and rearrange, we get
+
+```
+x = r^(-1) * (k*s1 - H(m1)) = r^(-1) * (k*s2 - H(m2)) mod q
+```
+
+After solving for `k` and simplifying, we get
+
+```
+k = (H(m1) - H(m2)) * (s1 - s2)^(-1) mod q
+```
+
+With this `k`, we can calculate the private key `x` in exactly the same way as in the previous challenge:
+
+```
+x = (r^(-1) * (s1*k - H(m1))) mod q = (r^(-1) * (s2*k - H(m2))) mod q
+```
 
 # [Challenge 45](https://cryptopals.com/sets/6/challenges/45)
 
