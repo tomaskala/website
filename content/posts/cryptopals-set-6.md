@@ -13,7 +13,8 @@ As always, my solutions can be found on [GitHub](https://github.com/tomaskala/cr
 - Never use RSA without padding. The attacker can manipulate the ciphertext in a way that affects the underlying plaintext ([Challenge 41](#challenge-41httpscryptopalscomsets6challenges41)).
 - Padding isn't there just for fun, it needs to be thoroughly checked to make sure it's exactly according to the specification. Also don't use small exponents just to speed up the computations, and while you're at it, don't use obsolete padding schemes ([Challenge 42](#challenge-42httpscryptopalscomsets6challenges42)).
 - Be careful about the ranges used to calculate cryptographical parameters. Small values make it easy to enumerate all possibilities and reverse calculations, leaking secret values ([Challenge 43](#challenge-43httpscryptopalscomsets6challenges43)).
-- Once again, never reuse nonces. In DSA, a reused nonce allows recovering the private key from a pair of signatures (([Challenge 44](#challenge-44httpscryptopalscomsets6challenges44))).
+- Once again, never reuse nonces. In DSA, a reused nonce allows recovering the private key from a pair of signatures ([Challenge 44](#challenge-44httpscryptopalscomsets6challenges44)).
+- DSA is sensitive to parameter hijacking ([Challenge 45](#challenge-45httpscryptopalscomsets6challenges45)).
 
 # [Challenge 41](https://cryptopals.com/sets/6/challenges/41)
 
@@ -180,6 +181,48 @@ x = (r^(-1) * (s1*k - H(m1))) mod q = (r^(-1) * (s2*k - H(m2))) mod q
 ```
 
 # [Challenge 45](https://cryptopals.com/sets/6/challenges/45)
+
+This challenge has us consider a hypothetical protocol utilizing DSA, where the client is allowed to propose values of the `p`, `q` and `g` parameters. Kind of like TLS or SSH where the two parties agree on common algorithms. This would be unsafe, because a MITM attack could force the client to propose unsafe parameters. The challenge gives two examples.
+
+First, any `g` congruent to 0 modulo `p`. In this case, a message signature is calculated as
+
+```
+k := random choice from [1, ..., q-1]
+r := (g^k mod p) mod q = 0
+s := (k^(-1) * (H(m) + x*r)) mod q = (k^(-1) * H(m)) mod q
+```
+
+Verification is done according to
+
+```
+w := s^(-1) mod q
+u1 := H(m) * w mod q
+u2 := r*w mod q = 0
+v := (g^u1 * y^u2 mod p) mod q = 0
+return v = r
+```
+
+We see that the verification always passes, because both `r` and `v` are always zero.
+
+A more interesting situation arises when `g` is congruent to 1 modulo `p`, for instance `g = p+1`. I had to think about this for a while, because the challenge isn't very clear on this. Under these parameters, the public key is always 1: `y = g^x mod p = (p+1)^x mod p = 1`. The challenge didn't make any sense, because the verifier is `v = (g^u1 * y^u2 mod p) mod q = 1`, and the `r` parameter is `r = (g^k mod p) mod q = 1`, so the whole thing reduced to the previous case. What the challenge has in mind but doesn't bother to mention is something else.
+
+The server in this hypothetical protocol has its private key `x` and public key `y` already generated using correct DSA parameters `(p, q, g)`, and they remain constant (like in TLS). The MITM attack hijacks the session, forces the client to use `(p, q, p+1)` instead, and then wants to forge a signature that verifies under the given public key `y`. That is, we want to calculate `r` and `s` such that `verify(p, q, p+1, y, r, s, m)` defined in Challenge 43 passes for any message `m`.
+
+Verification passes if `r = v`, where
+
+```
+v := (y^u2 mod p) mod q
+u2 := r*w mod q = r * s^(-1) mod q
+   => s = r * u2^(-1) mod q
+```
+
+We don't really care what `u2` is here. The forgery then works like this, renaming `u2` to `z` to get the same equations the challenge drops on us:
+
+1. We choose an arbitrary value `z`.
+2. Calculate `r = (y^z mod p) mod q`.
+3. Calculate `s = r * z^(-1) mod q`.
+
+This signature will pass for the given private key `y`, and what's interesting, it doesn't depend on the message itself. Any message will pass under this forged signature.
 
 # [Challenge 46](https://cryptopals.com/sets/6/challenges/46)
 
