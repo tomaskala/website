@@ -26,31 +26,31 @@ We are given a server with three endpoints:
 
 The server uses textbook RSA encryption, that is, directly converts the message into a number and perform RSA on that (without any padding). Anyone who submits a ciphertext gets the corresponding plaintext back. As a weak mitigation, the server stores every ciphertext upon encryption and refuses to decrypt it again. The assumption here is that once the legitimate user decrypts the ciphertext, nobody else can. Can they?
 
-Turns out they can. Because the messages are unpadded and encrypted as they are, any operation on the ciphertext directly affects the plaintext. The attacker can capture a ciphertext `C` and change it into
+Turns out they can. Because the messages are unpadded and encrypted as they are, any operation on the ciphertext directly affects the plaintext. The attacker can capture a ciphertext `c` and change it into
 
 ```
-C' = ((S^E mod N) * C) mod N
+c' = ((s^e mod N) * c) mod N
 ```
 
-where `S` is an arbitrary random number greater than 1. The original ciphertext `C` was computed from the plaintext `P` as
+where `s` is an arbitrary random number greater than 1. The original ciphertext `c` was computed from the plaintext message `m` as
 
 ```
-C = P^E mod N
+c = m^e mod N
 ```
 
-so `C'` becomes
+so `c'` becomes
 
 ```
-C' = ((S^E mod N) * C) mod N = ((S^E mod N) * (P^E mod N)) mod N = (S^E * P^E) mod N = (S*P)^E mod N
+c' = ((s^e mod N) * c) mod N = ((s^e mod N) * (m^e mod N)) mod N = (s^e * m^e) mod N = (s*m)^e mod N
 ```
 
-or, in other words, the encryption of a different plaintext `P' = S*P`. Because `S > 1`, the ciphertext `C'` differs from `C`, so the server's `decrypt` endpoint accepts it without any issue, and returns the plaintext `P'`. The attacker can easily reverse the math, and recover the original plaintext `P` by calculating
+or, in other words, the encryption of a different plaintext `m' = s*m`. Because `s > 1`, the ciphertext `c'` differs from `c`, so the server's `decrypt` endpoint accepts it without any issue, and returns the plaintext `m'`. The attacker can easily reverse the math, and recover the original plaintext `m` by calculating
 
 ```
-P = S^(-1) * P' mod N = S^(-1) * S * P mod N
+m = s^(-1) * m' mod N = s^(-1) * s * m mod N
 ```
 
-where `S^(-1)` is the multiplicative inverse of `S` modulo `N`.
+where `s^(-1)` is the multiplicative inverse of `s` modulo `N`.
 
 # [Challenge 42](https://cryptopals.com/sets/6/challenges/42)
 
@@ -63,10 +63,10 @@ Bleichenbacher's attack is valid in a particular scenario where the padding algo
 When the public exponent is 3, the RSA encryption (or, in this case, signature verification) reduces to a simple cubing:
 
 ```
-c := m^E mod N = m^3 mod N
+c := m^e mod N = m^3 mod N
 ```
 
-When the message is sufficiently small, cubing it won't exceed the modulus N, meaning that the modulo operation is not applied and the key isn't used at all. Nowadays the most common value of E is 2^16 + 1 = 65537, but historically E=3 was often used to speed up the computation. It isn't unsafe by itself, but when it meets the other bugs described below, it opens an attack vector.
+When the message is sufficiently small, cubing it won't exceed the modulus N, meaning that the modulo operation is not applied and the key isn't used at all. Nowadays the most common value of e is 2^16 + 1 = 65537, but historically e=3 was often used to speed up the computation. It isn't unsafe by itself, but when it meets the other bugs described below, it opens an attack vector.
 
 The PKCS#1 v1.5 padding algorithm (no longer recommended, but still sometimes implemented for backwards compatibility) looks like this:
 
@@ -86,7 +86,7 @@ Some signature verification implementations do not check the padding properly. I
 invalid-padded-message := 0x00 0x01 0xff ... 0xff 0x00 ASN.1 HASH GARBAGE
 ```
 
-Arbitrary bytes can follow the `HASH` part and the verification function doesn't check them. It turns out that we can utilize them to forge a signature for an arbitrary message without knowing the private key; as long as the public exponent is `E = 3`. Let's see how.
+Arbitrary bytes can follow the `HASH` part and the verification function doesn't check them. It turns out that we can utilize them to forge a signature for an arbitrary message without knowing the private key; as long as the public exponent is `e = 3`. Let's see how.
 
 The attacker wishes to forge a signature for a message `m` using a particular hash algorithm (I went for SHA-1 - although it's now known to be broken, it was widely used when the attack was published). They prepare a buffer as long as the modulus `N` (the correct size). They will then fill it like this:
 
@@ -96,9 +96,9 @@ buffer := 0x00 0x01 PADDING 0x00 ASN.1 HASH EMPTY
 
 Depending on what the verification algorithm checks for, the `PADDING` part can be left out entirely, filled with a single `0xff` byte, or filled with eight `0xff` bytes. The `ASN.1` part encodes the hash function used as usual in the PKCS#1 v1.5 padding, and `HASH = SHA-1(m)` in my case. The `EMPTY` part can contain anything as long as the entire buffer is as long as `N`.
 
-Now the attacker converts the buffer into a big integer. This causes the `0x00 0x01 PADDING 0x00 ASN.1 HASH` parts to appear in the higher-order digits, and the `EMPTY` part in the lower-order digits. They then calculate the integer cube root of this number rounded up, and convert the result back into a byte buffer. The cube root must be rounded up to ensure that when cubed again, the top bytes contain the forged values. When the verifier encrypts the message (which for `E = 3` means cubing it), the initial bytes of the resulting buffer will contain the values provided by the attacker. The `GARBAGE` part will contain a total mess, because our message was very likely not a perfect cube, so calculating a cube root did not result in an exact value. Because the verifier doesn't check whether `HASH` is right-justified (as it should), they won't notice though.
+Now the attacker converts the buffer into a big integer. This causes the `0x00 0x01 PADDING 0x00 ASN.1 HASH` parts to appear in the higher-order digits, and the `EMPTY` part in the lower-order digits. They then calculate the integer cube root of this number rounded up, and convert the result back into a byte buffer. The cube root must be rounded up to ensure that when cubed again, the top bytes contain the forged values. When the verifier encrypts the message (which for `e = 3` means cubing it), the initial bytes of the resulting buffer will contain the values provided by the attacker. The `GARBAGE` part will contain a total mess, because our message was very likely not a perfect cube, so calculating a cube root did not result in an exact value. Because the verifier doesn't check whether `HASH` is right-justified (as it should), they won't notice though.
 
-This only works if there's enough space in the buffer, that is, for large enough keys. My attack with SHA-1 broke when I tried it on a 1024-bit key, because there wasn't enough space. It works for a key size of 2048 bits an higher though. Notice that the attacker didn't even need the public key, just knowing the key size is enough. The attack becomes impractical for larger values of `E` than 3, because the larger the exponent, the more `GARBAGE` space is needed to contain the rounding error. That much space would require key sizes far larger than what's used in practice.
+This only works if there's enough space in the buffer, that is, for large enough keys. My attack with SHA-1 broke when I tried it on a 1024-bit key, because there wasn't enough space. It works for a key size of 2048 bits an higher though. Notice that the attacker didn't even need the public key, just knowing the key size is enough. The attack becomes impractical for larger values of `e` than 3, because the larger the exponent, the more `GARBAGE` space is needed to contain the rounding error. That much space would require key sizes far larger than what's used in practice.
 
 # [Challenge 43](https://cryptopals.com/sets/6/challenges/43)
 
@@ -225,6 +225,35 @@ We don't really care what `u2` is here. The forgery then works like this, renami
 This signature will pass for the given private key `y`, and what's interesting, it doesn't depend on the message itself. Any message will pass under this forged signature.
 
 # [Challenge 46](https://cryptopals.com/sets/6/challenges/46)
+
+As the instructions say, this challenge is a bit of a toy problem, but it sets the stage for the upcoming two challenges. It again shows us why pure number-theoretic encryption is dangerous, or in other words, why it's unsafe to do textbook RSA.
+
+We are given an oracle function that accepts an RSA-encrypted ciphertext, decrypts it, and answers whether the number representing the plaintext is odd or even. Using only repeated queries to this oracle, we can decrypt the entire ciphertext. All because in textbook RSA, a message is just a number, so any mathematical operations performed on the ciphertext directly affect the plaintext.
+
+First of all, the challenge contains an error: it claims that the RSA modulus is a prime number. That's nonsense, because the modulus is explicitly defined as the product of two prime numbers. What they mean is that the modulus is an _odd_ number (unless one of the primes was 2, which is a pathological case). Also, multiplying the ciphertext by `2^e mod N` doubles the _plaintext_, not the ciphertext. With that out of the way, let's see how to attack the oracle.
+
+In RSA, the message `m` is encrypted into the ciphertext `c` using the public key `(e, N)` according to
+
+```
+c = m^e mod N
+```
+
+Multiplying the ciphertext by any number directly affects the plaintext. Specifically for this challenge, multiplying `c` by `2^e mod N` doubles the plaintext:
+
+```
+2^e * c mod N = 2^e * m^e mod N = (2*m)^e mod N
+```
+
+If we feed the ciphertext multiplied by `2^e mod N` into the oracle function, we learn 1 bit of information about the plaintext, depending on what the oracle answers:
+
+1. Oracle says the plaintext is even. That means that `2*m mod N` is even, or in other words that the modulo operation did not wrap around. Therefore `2*m < N`, or equivalently, `m < N/2`.
+2. Oracle says the plaintext is odd. That means that `2*m mod N` is odd. The number `2*m` obviously cannot be odd, being a multiple of two. That means the modulo operation must have wrapped around, so that the number representing the plaintext is `2*m - N` (a difference of an even and an odd number is odd). This implies `2*m >= N`, or equivalently, `m >= N/2`.
+
+Putting the equality into the "odd" branch is somewhat arbitrary, because `2*m = N` cannot happen: `2*m` is by definition even, and `N` being a product of two prime numbers is always odd (unless one of the primes is 2, which is an edge case that doesn't happen in reality).
+
+Before querying the oracle, all we knew was `0 <= m < N`. After the query, the oracle gave us 1 bit of information, improving our estimate to either `0 <= m < N/2` or `N/2 <= m < N`.
+
+We can repeatedly query the oracle in a process similar to binary search by iteratively doubling the plaintext and tightening the interval, until we eventually recover the plaintext in `log2(N)` steps.
 
 # [Challenge 47](https://cryptopals.com/sets/6/challenges/47)
 
