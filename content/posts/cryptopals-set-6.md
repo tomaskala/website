@@ -15,6 +15,7 @@ As always, my solutions can be found on [GitHub](https://github.com/tomaskala/cr
 - Be careful about the ranges used to calculate cryptographical parameters. Small values make it easy to enumerate all possibilities and reverse calculations, leaking secret values ([Challenge 43](#challenge-43httpscryptopalscomsets6challenges43)).
 - Once again, never reuse nonces. In DSA, a reused nonce allows recovering the private key from a pair of signatures ([Challenge 44](#challenge-44httpscryptopalscomsets6challenges44)).
 - DSA is sensitive to parameter hijacking ([Challenge 45](#challenge-45httpscryptopalscomsets6challenges45)).
+- The PKCS#1 v1.5 RSA padding is completely broken and unless implemented incredibly carefully, allows an attacker to decrypt an arbitrary ciphertext simply by checking whether the padding is valid or not. Also avoid giving detailed error messages that leak information about your crypto system ([Challenge 47](#challenge-47httpscryptopalscomsets6challenges47), [Challenge 48](#challenge-48httpscryptopalscomsets6challenges48)).
 
 # [Challenge 41](https://cryptopals.com/sets/6/challenges/41)
 
@@ -257,4 +258,88 @@ We can repeatedly query the oracle in a process similar to binary search by iter
 
 # [Challenge 47](https://cryptopals.com/sets/6/challenges/47)
 
+This and the next exercise have us implement Bleichenbacher's famous attack against PKCS#1 v1.5-padded RSA encryption. The original article is available at [ETH Zurich](https://archiv.infsec.ethz.ch/education/fs08/secsem/Bleichenbacher98.pdf) and although heavy on the notation, it's not that difficult to implement the attack by following the math. The challenge's idea is to implement a subset of the attack that works against short keys, and to finish the implementation in Challenge 48. I chose to implement the full attack straight away though, it seemed more natural than having to pick apart what to implement now and what to postpone for later. I won't attempt to explain the attack in full or to copy the algorithm here, so instead I'll just go over the main ideas.
+
+## PKCS#1 v1.5 padding
+
+The PKCS#1 v1.5 padding of a plaintext message `p` looks like this:
+
+```
+m = 0x00 0x02 <padding> 0x00 p
+```
+
+The byte 0x02 indicates encryption (as opposed to signing from Challenge 42). The entire message `m` is padded with enough bytes to become exactly as long as the modulus `N`. The padding must consist of at least 8 non-zero bytes.
+
+The attack utilizes a PKCS#1 v1.5 padding oracle, that is, a function that accepts a ciphertext and returns whether the padding of the underlying plaintext is valid or not. As discussed towards the end of the paper, there are three scenarios the oracle can appear in:
+
+1. Plain encryption: The message is decrypted without any signature, and the system reports an error when the message is invalid.
+2. Detailed error messages: The message is both encrypted and signed, and the server returns a distinct error message when the padding is invalid.
+3. Timing attack: The message is both encrypted and signed, but the server doesn't return a distinct error message for invalid padding. Still, a timing difference can be observed, because signature validation doesn't occur for messages with invalid padding.
+
+Denote the byte length of the modulus `N` by `k`. Following the paper's notation, let's define `B = 2^(8*(k-2))`: the number of possible strings of `k-2` bytes. Because every padded message `m` starts with the bytes `0x00 0x02`, we have
+
+```
+0x00 0x02 0x00 ... 0x00 <= m <= 0x00 0x02 0xFF ... 0xFF
+```
+
+In other words
+
+```
+2B <= m <= 3B - 1
+```
+
+(`B` being `0x00 0x01 0x00 ... 0x00`).
+
+Recall also from Challenge 46 that multiplying the ciphertext `c = m^e mod N` by a number `s^e mod N` results in the encryption of `s*m`. The gist of the attack is to keep multiplying `c` by different values of `s` until the oracle says that the padding of `s*m` is valid.
+
+## Bleichenbacher's padding oracle attack (high level)
+
+The attack is done by iterating several stages.
+
+1. Capture a ciphertext `c` encrypted using the RSA public key `(e, N)`; the goal is to recover the padded message `m`.
+2. Keep a set `M` of ranges that together cover all possible values of `m`. This set will be refined during the attack until only a single candidate number (the actual `m`) remains. Initialize `M` to cover all correctly padded messages: `M = {[2B, 3B - 1]}`.
+3. Find an integer `s_i` such that `s_i * m mod N` is a correctly padded message. This requires trying out many possible values for `s_i` and querying the oracle for each.
+4. Calculate a new set of ranges `M_i` using the integer `s_i`. The set `M_i` includes all possible values of `m` such that `s_i * m mod N` is correctly padded.
+5. Combine `M` with `M_i` to make a new set of ranges. Calculate new sub-intervals from `M` and `M_i` and union them together.
+6. If the set `M` only contains a single interval that collapsed into a single point, the message `m` has been recovered. Otherwise, go back to step 2 and repeat the procedure.
+
+## Bleichenbacher's padding oracle attack (calculating intervals)
+
+Once we have found `s_i` such that `s_i * m mod N` is correctly padded in step 3, we need to calculate a new set of range `M_i` in step 4.
+
+Because `s_i * m mod N` is correctly padded, it follows that
+
+```
+2B <= s_i * m mod N <= 3B - 1
+```
+
+By definition of the modulo operator, we have
+
+```
+s_i * m = (s_i * m mod N) + r*N
+```
+
+for some integer `r` (the quotient). We know `s_i` and `N` but not `m` (that's what we are trying to find). We therefore know only the lower and upper bound:
+
+```
+(s_i * m)_min = 2B + r*N
+(s_i * m)_max = 3B - 1 + r*N
+```
+
+By rearranging, we get the following bounds on `m`:
+
+```
+(2B + r*N)/s_i <= m <= (3B - 1 + r*N)/s_i
+```
+
+The trouble is that we don't know `r`. What we can do is to solve the two inequalities for `r`, giving us
+
+```
+(s_i * m - 3B + 1)/N <= r <= (s_i * m - 2B)/N
+```
+
+We still don't know `m` of course, but we know what its range is from the previous `M`. We can plug these in for `m` into the inequality to obtain the valid range for `r`. This is exactly what happens in Step 3 of the paper.
+
 # [Challenge 48](https://cryptopals.com/sets/6/challenges/48)
+
+Like I wrote above, the purpose of this challenge was to finalize the implementation of Bleichenbacher's attack against a RSA padding oracle, but I implemented it fully in Challenge 47, so all I had to do was to write another test case. This used to be the last challenge, but new sets have been published since, so we still have some way to go.
