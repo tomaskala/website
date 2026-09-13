@@ -1,12 +1,11 @@
 ---
 title: "Cryptopals - Set 6"
-date: 2026-08-26T20:50:02+02:00
-draft: true
+date: 2026-09-13T15:50:02+02:00
 ---
 
-The sixth set of the [cryptopals](https://cryptopals.com/) challenges exclusively focuses on RSA and DSA, meaning that the attacks feature more mathematics than before. It's worth it though, because some of the tasks model attacks that can break real cryptography.
+The sixth set of the [cryptopals](https://cryptopals.com/) challenges exclusively focuses on RSA and DSA, meaning that the attacks feature more mathematics than before. They keep mentioning this with a warning, but personally I often found these easier than some of the previous challenges. It is as if the math was guiding me towards the solution.
 
-As always, my solutions can be found on [GitHub](https://github.com/tomaskala/cryptopals).
+As always, my implementation can be found on [GitHub](https://github.com/tomaskala/cryptopals).
 
 # Lessons learned
 
@@ -25,7 +24,7 @@ We are given a server with three endpoints:
 2. `encrypt(plaintext)`: Encrypt an arbitrary plaintext using RSA.
 3. `decrypt(ciphertext)`: Check if the ciphertext was decrypted before. If it was, return an error. Otherwise, decrypt it and return the plaintext.
 
-The server uses textbook RSA encryption, that is, directly converts the message into a number and perform RSA on that (without any padding). Anyone who submits a ciphertext gets the corresponding plaintext back. As a weak mitigation, the server stores every ciphertext upon encryption and refuses to decrypt it again. The assumption here is that once the legitimate user decrypts the ciphertext, nobody else can. Can they?
+The server uses textbook RSA encryption: it directly converts the message into a number and perform RSA on that (without any padding). Anyone who submits a ciphertext gets the corresponding plaintext back. As a weak mitigation, the server stores every ciphertext upon encryption and refuses to decrypt it again. The assumption here is that once the legitimate user decrypts the ciphertext, nobody else can. Can they?
 
 Turns out they can. Because the messages are unpadded and encrypted as they are, any operation on the ciphertext directly affects the plaintext. The attacker can capture a ciphertext `c` and change it into
 
@@ -45,7 +44,7 @@ so `c'` becomes
 c' = ((s^e mod N) * c) mod N = ((s^e mod N) * (m^e mod N)) mod N = (s^e * m^e) mod N = (s*m)^e mod N
 ```
 
-or, in other words, the encryption of a different plaintext `m' = s*m`. Because `s > 1`, the ciphertext `c'` differs from `c`, so the server's `decrypt` endpoint accepts it without any issue, and returns the plaintext `m'`. The attacker can easily reverse the math, and recover the original plaintext `m` by calculating
+In other words, `c'` is the encryption of a different plaintext `m' = s*m`. Because `s > 1`, the ciphertext `c'` differs from `c`, so the server's `decrypt` endpoint accepts it without any issue, and returns the plaintext `m'`. The attacker can easily reverse the math, and recover the original plaintext `m` by calculating
 
 ```
 m = s^(-1) * m' mod N = s^(-1) * s * m mod N
@@ -67,7 +66,9 @@ When the public exponent is 3, the RSA encryption (or, in this case, signature v
 c := m^e mod N = m^3 mod N
 ```
 
-When the message is sufficiently small, cubing it won't exceed the modulus N, meaning that the modulo operation is not applied and the key isn't used at all. Nowadays the most common value of e is 2^16 + 1 = 65537, but historically e=3 was often used to speed up the computation. It isn't unsafe by itself, but when it meets the other bugs described below, it opens an attack vector.
+When the message is sufficiently small, cubing it won't exceed the modulus N, meaning that the modulo operation is not applied and the key isn't used at all. Nowadays the most common value of e is 2^16 + 1 = 65537, but historically e=3 was often used to speed up the computation. It isn't unsafe by itself, but when it meets the other bugs described below, it opens up an attack vector.
+
+## PKCS#1 v1.5 padding
 
 The PKCS#1 v1.5 padding algorithm (no longer recommended, but still sometimes implemented for backwards compatibility) looks like this:
 
@@ -89,15 +90,17 @@ invalid-padded-message := 0x00 0x01 0xff ... 0xff 0x00 ASN.1 HASH GARBAGE
 
 Arbitrary bytes can follow the `HASH` part and the verification function doesn't check them. It turns out that we can utilize them to forge a signature for an arbitrary message without knowing the private key; as long as the public exponent is `e = 3`. Let's see how.
 
+## Bleichenbacher's e=3 attack
+
 The attacker wishes to forge a signature for a message `m` using a particular hash algorithm (I went for SHA-1 - although it's now known to be broken, it was widely used when the attack was published). They prepare a buffer as long as the modulus `N` (the correct size). They will then fill it like this:
 
 ```
 buffer := 0x00 0x01 PADDING 0x00 ASN.1 HASH EMPTY
 ```
 
-Depending on what the verification algorithm checks for, the `PADDING` part can be left out entirely, filled with a single `0xff` byte, or filled with eight `0xff` bytes. The `ASN.1` part encodes the hash function used as usual in the PKCS#1 v1.5 padding, and `HASH = SHA-1(m)` in my case. The `EMPTY` part can contain anything as long as the entire buffer is as long as `N`.
+Depending on what the verification algorithm checks for, the `PADDING` part can be left out entirely, filled with a single `0xff` byte, or filled with eight `0xff` bytes. The `ASN.1` part encodes the hash function as is usual in the PKCS#1 v1.5 padding, and `HASH = SHA-1(m)` in my case. The `EMPTY` part can contain anything as long as the entire buffer is as long as `N`.
 
-Now the attacker converts the buffer into a big integer. This causes the `0x00 0x01 PADDING 0x00 ASN.1 HASH` parts to appear in the higher-order digits, and the `EMPTY` part in the lower-order digits. They then calculate the integer cube root of this number rounded up, and convert the result back into a byte buffer. The cube root must be rounded up to ensure that when cubed again, the top bytes contain the forged values. When the verifier encrypts the message (which for `e = 3` means cubing it), the initial bytes of the resulting buffer will contain the values provided by the attacker. The `GARBAGE` part will contain a total mess, because our message was very likely not a perfect cube, so calculating a cube root did not result in an exact value. Because the verifier doesn't check whether `HASH` is right-justified (as it should), they won't notice though.
+Now the attacker converts the buffer into a big integer. This causes the `0x00 0x01 PADDING 0x00 ASN.1 HASH` parts to appear in the higher-order digits, and the `EMPTY` part in the lower-order digits. They then calculate the integer cube root of this number rounded up, and convert the result back into a byte buffer. The cube root must be rounded up to ensure that when cubed again, the top bytes contain the forged values. When the verifier encrypts the message (which for `e = 3` means cubing it), the initial bytes of the resulting buffer will contain the values provided by the attacker. The `GARBAGE` part will contain a total mess, because our message was very likely not a perfect cube, so calculating a cube root did not result in an exact value. Because the verifier doesn't check whether `HASH` is right-justified (as it should), they won't notice this.
 
 This only works if there's enough space in the buffer, that is, for large enough keys. My attack with SHA-1 broke when I tried it on a 1024-bit key, because there wasn't enough space. It works for a key size of 2048 bits an higher though. Notice that the attacker didn't even need the public key, just knowing the key size is enough. The attack becomes impractical for larger values of `e` than 3, because the larger the exponent, the more `GARBAGE` space is needed to contain the rounding error. That much space would require key sizes far larger than what's used in practice.
 
@@ -105,7 +108,7 @@ This only works if there's enough space in the buffer, that is, for large enough
 
 This and the two following challenges center around DSA - Digital Signature Algorithm. Nowadays the algorithm has been deprecated and more modern alternatives based on elliptic curves are preferred. DSA itself isn't broken, but the most commonly used key size of 1024 bits is weak now, and larger sizes aren't widely supported.
 
-DSA uses three parameters called `p` (a large prime number), `q` (a somewhat smaller prime number) and `g`. Their generation is somewhat involved, so the challenge is nice enough to give us pre-computed values. It involves three operations, denoting the private key by `x`, public key by `y`, a message to be signed by `m` and a hash function by `H` (typically SHA-1 - DSA is old):
+DSA uses three parameters called `p` (a large prime number), `q` (a smaller prime number) and `g`. Their generation is somewhat involved, so the challenge is nice enough to give us pre-computed values. The challenge involves three operations. Denoting the private key by `x`, public key by `y`, a message to be signed by `m` and a hash function by `H` (typically SHA-1 - DSA is old), these are:
 
 ```
 generate-keys(p, q, g):
@@ -155,7 +158,7 @@ Regardless of which method we use, we can quickly crack the private key when the
 
 # [Challenge 44](https://cryptopals.com/sets/6/challenges/44)
 
-Another in the series of challenges showing why reusing a nonce breaks cryptography. In DSA, the value `k` must be generated unique per message; otherwise, anyone can recompute the private key `x` from a message `m` and its signature `(r, s)`.
+Another in the series of challenges showing why reusing a nonce breaks cryptography. In DSA, the value `k` must be generated unique per message; otherwise, anyone can recompute the private key `x` from two messages `m1` and `m2`, and their signatures `(r1, s1)` and `(r2, s2)`.
 
 From the signing operation, the `s` part of the signature is calculated as
 
@@ -279,7 +282,7 @@ The attack utilizes a PKCS#1 v1.5 padding oracle, that is, a function that accep
 Denote the byte length of the modulus `N` by `k`. Following the paper's notation, let's define `B = 2^(8*(k-2))`: the number of possible strings of `k-2` bytes. Because every padded message `m` starts with the bytes `0x00 0x02`, we have
 
 ```
-0x00 0x02 0x00 ... 0x00 <= m <= 0x00 0x02 0xFF ... 0xFF
+0x00 0x02 0x00 ... 0x00 <= m <= 0x00 0x02 0xff ... 0xff
 ```
 
 In other words
@@ -300,7 +303,7 @@ The attack is done by iterating several stages.
 2. Keep a set `M` of ranges that together cover all possible values of `m`. This set will be refined during the attack until only a single candidate number (the actual `m`) remains. Initialize `M` to cover all correctly padded messages: `M = {[2B, 3B - 1]}`.
 3. Find an integer `s_i` such that `s_i * m mod N` is a correctly padded message. This requires trying out many possible values for `s_i` and querying the oracle for each.
 4. Calculate a new set of ranges `M_i` using the integer `s_i`. The set `M_i` includes all possible values of `m` such that `s_i * m mod N` is correctly padded.
-5. Combine `M` with `M_i` to make a new set of ranges. Calculate new sub-intervals from `M` and `M_i` and union them together.
+5. Combine `M` with `M_i` to make a new set of ranges `M`: calculate new sub-intervals from `M` and `M_i` and union them together.
 6. If the set `M` only contains a single interval that collapsed into a single point, the message `m` has been recovered. Otherwise, go back to step 2 and repeat the procedure.
 
 ## Bleichenbacher's padding oracle attack (calculating intervals)
@@ -319,7 +322,7 @@ By definition of the modulo operator, we have
 s_i * m = (s_i * m mod N) + r*N
 ```
 
-for some integer `r` (the quotient). We know `s_i` and `N` but not `m` (that's what we are trying to find). We therefore know only the lower and upper bound:
+for some integer `r` (the quotient). We know `s_i` and `N` but not `m` (that's what we are trying to find). We know only the lower and upper bounds:
 
 ```
 (s_i * m)_min = 2B + r*N
@@ -342,4 +345,4 @@ We still don't know `m` of course, but we know what its range is from the previo
 
 # [Challenge 48](https://cryptopals.com/sets/6/challenges/48)
 
-Like I wrote above, the purpose of this challenge was to finalize the implementation of Bleichenbacher's attack against a RSA padding oracle, but I implemented it fully in Challenge 47, so all I had to do was to write another test case. This used to be the last challenge, but new sets have been published since, so we still have some way to go.
+Like I wrote above, the purpose of this challenge was to finalize the implementation of Bleichenbacher's attack against a RSA padding oracle, but I implemented it fully in Challenge 47, so all I had to do was to write another test case. This used to be the last challenge, but new sets have been published since, so we still have some challenges left.
