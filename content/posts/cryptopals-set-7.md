@@ -88,6 +88,105 @@ Leaving the IV in control of the attacker gives them full control over the first
 
 ## Part 2: Length-extension attack
 
+Clearly, giving the attacker control over the IV is a bad idea, so we fix it to all zeroes. CBC-MAC is still vulnerable to a length extension attack though, which we will now exploit. The transaction system from part 1 now processes several transactions from the same account in a single message for efficiency. The transaction now looks like this:
+
+```
+from=<sender-ID>&tx_list=<transaction-list> || MAC
+```
+
+The transaction list consists of semicolon-separated pairs `<recipient-id>:<amount>`. The entire message is also URL-encoded, meaning that the semicolons and colons are replaced by their escaped representations. For example, a message sending $1000 to `rec1` and $2000 to `rec2` from `sndr` would be encoded as
+
+```
+from=sndr&tx_list=rec1%3A1000%3Brec2%3A2000 || MAC
+```
+
+The setting is the same as before. We as an attacker have captured the message above and want to change it to get some free money. Specifically, we want to append `;atck:100000` (before URL-encoding) and tamper the message enough to make the MAC validate. All we have access to is the captured message and an endpoint that can construct a similar message from our own account. That is, for an arbitrary transaction list, we can construct a message
+
+```
+from=atck&tx_list=<transaction-list> || MAC
+```
+
+Note that the beginning of the message is fixed - we can (of course) only send money from our own account.
+
+Here's some ASCII art showing what we have captured on the left, and what we would like to append on the right.
+
+```
+from=sndr&tx_lis t=rec1%3A1000%3B rec2%3A2000PPPPP │ | ----glue---- | %3Batck%3A100000 ◄─── payload
+           │                │                │     │            │                │                 
+           ▼                ▼                ▼     │            ▼                ▼                 
+  IV=0 ─► XOR    ┌───────► XOR    ┌───────► XOR    │ ┌───────► XOR    ┌───────► XOR                
+           │     │          │     │          │     │ │          │     │          │                 
+           ▼     │          ▼     │          ▼     │ │          ▼     │          ▼                 
+     K ─► AES ───┘    K ─► AES ───┘    K ─► AES ───┼─┘    K ─► AES ───┘    K ─► AES                
+                                             │     │                             │                 
+                                             ▼     │                             ▼                 
+                                            MAC    │                            MAC'
+```
+
+The five `P` characters at the end of the last captured block is the padding, itself not a part of the captured message. The `glue` block is there to ensure our message aligns on a block boundary, and its value is entirely arbitrary. We see from the diagram that the way to calculate `MAC'` (the hash we want) is
+
+```
+MAC' = AES(payload XOR AES(glue XOR MAC))
+```
+
+We cannot directly calculate this, because we don't know the encryption key `K`. The challenge mentions that the attack would be much easier if we had full control over the first block returned from the client endpoint, so let's try that. We could then construct a message like this:
+
+```
+| -- block1 -- | %3Batck%3A100000 ◄─── payload
+           │                │                 
+           ▼                ▼                 
+  IV=0 ─► XOR    ┌───────► XOR                
+           │     │          │                 
+           ▼     │          ▼                 
+     K ─► AES ───┘    K ─► AES                
+                            │                 
+                            ▼                 
+                           MAC''
+```
+
+Its MAC is calculated as
+
+```
+MAC'' = AES(payload XOR AES(block1 XOR IV)) = AES(payload XOR AES(block1 XOR 0)) = AES(payload XOR AES(block1))
+```
+
+By comparing the equations for `MAC'` and `MAC''`, we see that by setting `block1 := glue XOR MAC`, we calculate `MAC'`, which is what we wanted all along.
+
+There are two problems with this:
+
+1. We don't have control over the first block, it's always fixed to `from=atck%tx_lis`.
+2. Even if we did, the second block wouldn't be equal to our payload. At best, it would be `t=atck%3A100000`. It's missing the URL-encoded semicolon (`%3B`) to separate our payload from the legitimate message.
+
+Problem 1 actually helps us. Because the first block is fixed, we can revert the equation for `block1` and calculate the value for `glue`:
+
+```
+block1 := glue XOR MAC <=> glue := block1 XOR MAC
+```
+
+We will circumvent problem 2 by sending two recipients, which will ensure a semicolon is present:
+
+```
+message := client([{"recipient": "atck", "amount": 1}, {"recipient": "atck", "amount": 100000}])
+```
+
+This will result in a message like
+
+```
+block1           block2           block3
+from=atck%tx_lis t=atck%3A1%3Batc k%3A100000
+```
+
+Putting it all together, we need to craft a message like this:
+
+```
+|---------- captured message + padding ----------| |-- client endpoint message -|
+from=sndr&tx_lis t=rec1%3A1000%3B rec2%3A2000PPPPP (block1 XOR MAC) block2 block3 || MAC''
+```
+
+Here `MAC` comes from the initial message we captured and `MAC''` comes from the attacker's query to the client endpoint.
+
+This challenge took me a while, the whole process is pretty convoluted. The success of this attack depends on the server implementation. The padding that has to be included in the tampered message might trigger an error, but the server might also be benevolent and just skip entries it cannot successively parse. This was the same back in the SHA-1 length extension attack in [Set 4](/posts/cryptopals-set-4).
+
 # [Challenge 50](https://cryptopals.com/sets/7/challenges/50)
 
 # [Challenge 51](https://cryptopals.com/sets/7/challenges/51)
