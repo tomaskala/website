@@ -10,7 +10,9 @@ As always, my implementation can be found on [GitHub](https://github.com/tomaska
 
 # Lessons learned
 
-- When CBC-MAC is used, the IV must remain fixed. If you allow the attacker to control the IV, they gain full control over the first block of the message. ([Challenge 49](#challenge-49httpscryptopalscomsets7challenges49) Part 1).
+- When CBC-MAC is used, the IV must remain fixed. If you allow the attacker to control the IV, they gain full control over the first block of the message ([Challenge 49](#challenge-49httpscryptopalscomsets7challenges49) Part 1).
+- CBC-MAC is vulnerable to length-extension attacks ([Challenge 49](#challenge-49httpscryptopalscomsets7challenges49) Part 2).
+- Cryptographic hash functions and MACs serve entirely different purposes. Using one in place of the other is a very bad idea ([Challenge 50](#challenge-49httpscryptopalscomsets7challenges50)).
 
 # [Challenge 49](https://cryptopals.com/sets/7/challenges/49)
 
@@ -188,6 +190,59 @@ Here `MAC` comes from the initial message we captured and `MAC''` comes from the
 This challenge took me a while, the whole process is pretty convoluted. The success of this attack depends on the server implementation. The padding that has to be included in the tampered message might trigger an error, but the server might also be benevolent and just skip entries it cannot successively parse. This was the same back in the SHA-1 length extension attack in [Set 4](/posts/cryptopals-set-4).
 
 # [Challenge 50](https://cryptopals.com/sets/7/challenges/50)
+
+This challenge focuses on the difference between cryptographic hash functions and MACs, specifically between the guarantees they provide. In short:
+
+- Cryptographic hash functions are public (i.e., there's no secret key involved) that are collision-resistant. It is very hard to find two different strings that hash to the same value.
+- MACs are keyed functions that provide message unforgeability. As long as the key is secret, it is very hard to create a valid signature for a message.
+
+CBC-MAC is (as the name suggests) a MAC function but not a cryptographic hash function. We will demonstrate this by creating a valid string that hashes to a given value.
+
+We are given this snippet of JavaScript:
+
+```
+alert('MZA who was that?');\n
+```
+
+It hashes to `296b8d7cb78a243dda4d0a61d33bbdd1` under CBC-MAC with the key `YELLOW SUBMARINE` and an all-zero IV. Our goal is to create a different JavaScript snippet that alerts `Ayo, the Wu is back!` and hashes to the same value.
+
+Basically we need to take the string `alert('Ayo, the Wu is back!');` and tweak it enough to make it hash to the correct while while ensuring it remains a valid JavaScript snippet. The easiest way is to append a JS comment and hide all the tampering in there.
+
+Schematically, what we will build is something like this:
+
+```
+   p1                  p2                                        p3         p4              
+ | alert('Ayo, the | | Wu is back!');/* | | PPPPPPPPPPPPPPPP | | <glue> | | **************/P |
+          │                  │                    │                │              │        
+          ▼                  ▼                    ▼                ▼              ▼        
+ IV=0 ─► XOR       ┌──────► XOR        ┌───────► XOR       ┌────► XOR     ┌────► XOR       
+          │        │         │         │          │        │       │      │       │        
+          ▼        │         ▼         │          ▼        │       ▼      │       ▼        
+    K ─► AES ──────┘   K ─► AES ───────┘    K ─► AES ──────┘ K ─► AES ────┘ K ─► AES       
+                                                  │                               │        
+                                                  ▼                               ▼        
+                                                  c                               m
+```
+
+The blocks `p1` and `p2` hold the message we want to create and open a comment to hide the tampering in. Because `p2` ends exactly on a block boundary, a full padding block follows. Then block `p3` will contain some garbage bytes (to be determined) that ensure the hash is correct, and `p4` ends the comment. Note that `p4` is one byte shorter than the block size to ensure that it is the last block; if we added one more asterisk, it would have to follow with one full block of padding, which we don't want. We also denote the hash of the padded message by `c`, and the full hash by `m`. We want `m` to be equal to the provided hash `296b8d7cb78a243dda4d0a61d33bbdd1`.
+
+Written out, `m` is calculated as
+
+```
+m = E_K(p4 XOR E_K(p3 XOR c))
+```
+
+Here `E_K` denotes AES encryption under the key `K`. Denoting the corresponding decryption operation by `D_K`, we can solve this equation for `p3` and obtain exactly the form we need to set it to:
+
+```
+p3 = c XOR D_K(p4 XOR D_K(m))
+```
+
+The full message is then
+
+```
+alert('Ayo, the Wu is back!');/* || <padding> || p3 || p4
+```
 
 # [Challenge 51](https://cryptopals.com/sets/7/challenges/51)
 
