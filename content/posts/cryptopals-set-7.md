@@ -12,7 +12,8 @@ As always, my implementation can be found on [GitHub](https://github.com/tomaska
 
 - When CBC-MAC is used, the IV must remain fixed. If you allow the attacker to control the IV, they gain full control over the first block of the message ([Challenge 49](#challenge-49httpscryptopalscomsets7challenges49) Part 1).
 - CBC-MAC is vulnerable to length-extension attacks ([Challenge 49](#challenge-49httpscryptopalscomsets7challenges49) Part 2).
-- Cryptographic hash functions and MACs serve entirely different purposes. Using one in place of the other is a very bad idea ([Challenge 50](#challenge-49httpscryptopalscomsets7challenges50)).
+- Cryptographic hash functions and MACs serve entirely different purposes. Using one in place of the other is a very bad idea ([Challenge 50](#challenge-50httpscryptopalscomsets7challenges50)).
+- Compressing a plaintext before encrypting it sounds like a good idea, but it can actually leak information, enabling an attacker to discover a piece of the plaintext under certain scenarios. See the [CRIME](https://en.wikipedia.org/wiki/CRIME) and [BREACH](https://en.wikipedia.org/wiki/BREACH) attacks ([Challenge 51](#challenge-51httpscryptopalscomsets7challenges51)).
 
 # [Challenge 49](https://cryptopals.com/sets/7/challenges/49)
 
@@ -245,6 +246,61 @@ alert('Ayo, the Wu is back!');/* || <padding> || p3 || p4
 ```
 
 # [Challenge 51](https://cryptopals.com/sets/7/challenges/51)
+
+This challenge models the [CRIME](https://en.wikipedia.org/wiki/CRIME) security vulnerability in TLS, in which a compression side channel is opened that leaks information about secret cookies. If an attacker recovers an authentication cookie, they can steal the user session and impersonate them.
+
+The attacker must be capable of two things in order to successfully launch the attack:
+
+1. Inject chosen plaintext: The attacker can input arbitrary data on behalf of the user into a request. They will use it to take more and more accurate guesses about what the secret cookie's value is.
+2. Observe the size of the compressed and encrypted request: The attacker can measure how well their injected data compressed, and use that to improve their cookie guess.
+
+In practice, the attacker manipulates the victim's browser into sending a request with the attacker-controlled payload attached, for example using JavaScript or even an HTML tag. Because the victim's browser sends the request, the correct cookie gets automatically attached. The attacker then just passively observes the request size and infers the cookie from that.
+
+For a concrete example, suppose that the user's request looks like this:
+
+```
+POST / HTTP/1.1
+Host: hapless.com
+Cookie: sessionid=TmV2ZXIgcmV2ZWFsIHRoZSBXdS1UYW5nIFNlY3JldCE=
+Content-Length: len(<payload>)
+<payload>
+```
+
+where `<payload>` is attacker-controlled. This request is first compressed and then encrypted by the TLS protocol before being sent to the user.
+
+If an attacker submits a payload of `Cookie: sessionid=T`, it should compress somewhat better than `Cookie: sessionid=S`, because it's a substring of what has actually appeared in the response already. The compression algorithm can just replace it with a back-reference to a string already occurring in the response. As such, the response length of a prefix of the true cookie will compress better than when an invalid cookie value is inputted. That's the whole idea of the attack.
+
+The challenge has two parts. The first one utilizes a stream cipher for encryption, and the second makes the attack a bit more difficult by switching to a block cipher. Let's see both.
+
+## Stream cipher
+
+In this scenario, the server returns a response using this endpoint:
+
+```
+oracle(request):
+  key := random bytes
+  nonce := random bytes
+  return aes-ctr(compress(format-request(request)), key, nonce)
+```
+
+The attacker can't just start trying out all bytes and hope to match the cookie, because if they happened to pass, say, `ess`, it would match in both `hapless.com` and in `sessionid`. The compression algorithm would replace the string with a back-reference, and then either `ess.` or `essi` would appear to be valid cookie values. Instead, the attacker must anchor the payload to the correct place by starting with a prefix known to match the cookie. I went with `Cookie: sessionid=`.
+
+The attack proceeds by iteratively trying out all 256 possible bytes, appending them to the anchor, and querying the oracle. The byte minimizing the response length is the correct one, so it gets appended to the recovered cookie, and we proceed with the next byte. The iteration stops once we reach a newline separator.
+
+## Block cipher
+
+The endpoint now changes to
+
+```
+oracle(request):
+  key := random bytes
+  iv := random bytes
+  return aes-cbc(pad(compress(format-request(request))), key, iv)
+```
+
+Using a block cipher makes the attack slightly more complicated, because the padding messes up our size measurements. Even if we manage to save 1 byte by taking the correct guess and compressing it, the result will still have the same length, because it will be padded to the same multiple of 16 bytes as a wrong guess would. The only exception is one byte below the block boundary. A wrong guess there will exactly match it, so another full block of padding is needed. On the other hand, a correct guess will compress perfectly, requiring only a single byte of padding to be added.
+
+We keep prepending an increasing number of random bytes to the payload; these should compress poorly and as such each add one to the compressed length. Eventually they will push the payload one byte below the block boundary where our correct guess results in a shorted payload.
 
 # [Challenge 52](https://cryptopals.com/sets/7/challenges/52)
 
